@@ -1,108 +1,83 @@
 import os
+import logging
+import yt_dlp
 from pyrogram import Client, filters
-from pyrogram.types import Message
-from yt_dlp import YoutubeDL
-from pyrogram.errors import FloodWait
-import requests
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+import threading
 
-# Initialize bot
-API_ID = os.getenv("API_ID")
-API_HASH = os.getenv("API_HASH")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-DUMP_CHAT_ID = os.getenv("DUMP_CHAT_ID")  # ID of the chat where you want to dump logs
+# Initialize the bot
+app = Client("my_bot", bot_token="YOUR_BOT_TOKEN")
 
-bot = Client("url_uploader_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
-# Command handlers
-@bot.on_message(filters.command("start"))
-async def start(_, message: Message):
-    start_msg = (
-        "Hello! I'm your video downloader bot. Here are some commands you can use:\n"
-        "/start - Start the bot\n"
-        "/help - Get help on how to use the bot\n"
-        "/quality - List available quality options for downloading videos\n"
-    )
-    await message.reply_text(start_msg)
+def is_valid_url(url):
+    return url.startswith('http://') or url.startswith('https://')
 
-@bot.on_message(filters.command("help"))
-async def help(_, message: Message):
-    help_msg = (
-        "To use this bot, send me a video URL. I support various platforms like YouTube.\n\n"
-        "You can choose the quality of the video by sending:\n"
-        "/quality - List available quality options\n"
-        "\nThe bot will send the video and its thumbnail."
-    )
-    await message.reply_text(help_msg)
-
-@bot.on_message(filters.command("quality"))
-async def quality(_, message: Message):
-    quality_msg = (
-        "Available quality options:\n"
-        "1. Best\n"
-        "2. 720p\n"
-        "3. 480p\n"
-        "4. 360p\n"
-        "\nSend the quality option number before the URL to select."
-    )
-    await message.reply_text(quality_msg)
-
-# Video download from URL
-@bot.on_message(filters.text)
-async def download_video(_, message: Message):
-    text = message.text.split()
-    quality = "best"  # Default quality
-    url = None
-
-    # Parse quality and URL
-    if len(text) > 1 and text[0].isdigit():
-        quality = text[0]
-        url = " ".join(text[1:])
-    else:
-        url = " ".join(text)
-
-    if not url:
-        await message.reply_text("Please provide a URL.")
+async def download_video(client, message):
+    url = message.text.strip()
+    
+    if not is_valid_url(url):
+        await message.reply_text("Invalid URL. Please send a valid video URL.")
         return
+    
+    progress_message = await message.reply_text("Downloading...", quote=True)
+    
+    def update_progress(progress):
+        client.loop.create_task(
+            client.edit_message_text(progress_message.chat.id, progress_message.message_id, 
+                                     f"Downloading... {int(progress * 100)}%"))
+    
+    def download_and_send():
+        try:
+            ydl_opts = {
+                'format': 'best',
+                'outtmpl': 'temp_video.%(ext)s',
+                'progress_hooks': [lambda d: update_progress(d['downloaded_bytes'] / d['total_bytes'])],
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                
+            client.loop.create_task(
+                client.send_document(message.chat.id, 'temp_video.mp4'))
+            os.remove('temp_video.mp4')
+            client.loop.create_task(
+                client.edit_message_text(progress_message.chat.id, progress_message.message_id, 
+                                         f"Download complete: {info['title']}"))
+        except yt_dlp.utils.DownloadError as e:
+            client.loop.create_task(
+                client.edit_message_text(progress_message.chat.id, progress_message.message_id, 
+                                         f"Error: {str(e)}"))
+        except Exception as e:
+            client.loop.create_task(
+                client.edit_message_text(progress_message.chat.id, progress_message.message_id, 
+                                         f"An unexpected error occurred: {str(e)}"))
 
-    await message.reply_text(f"Downloading video from: {url} with quality: {quality}")
+    threading.Thread(target=download_and_send).start()
 
-    ydl_opts = {
-        'outtmpl': 'downloads/%(title)s.%(ext)s',
-        'format': f'bestvideo[height<={quality}]+bestaudio/best' if quality.isdigit() else 'best',
-        'noplaylist': True,
-        'quiet': True,
-        'progress_hooks': [progress_hook],
-    }
+@app.on_message(filters.command("start"))
+async def start_message(client, message):
+    await message.reply_text("Send a video link to start downloading.")
 
-    try:
-        with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            file_name = ydl.prepare_filename(info)
-            thumbnail_url = info.get('thumbnail', '')
+@app.on_message(filters.regex(r'http[s]?://'))
+async def handle_link(client, message):
+    url = message.text.strip()
+    if not is_valid_url(url):
+        await message.reply_text("Invalid URL. Please send a valid video URL.")
+        return
+    
+    markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("360p", callback_data=f"quality_360_{url}"),
+         InlineKeyboardButton("720p", callback_data=f"quality_720_{url}"),
+         InlineKeyboardButton("1080p", callback_data=f"quality_1080_{url}")]
+    ])
+    await message.reply_text("Choose the video quality:", reply_markup=markup)
 
-        # Send video with thumbnail
-        with open(file_name, 'rb') as video_file:
-            await message.reply_video(video_file, caption=f"Downloaded video from {url}")
+@app.on_callback_query()
+async def handle_query(client, callback_query):
+    data = callback_query.data
+    quality, url = data.split("_")[1], "_".join(data.split("_")[2:])
+    await download_video(client, callback_query.message)
 
-        # Send thumbnail
-        if thumbnail_url:
-            thumb = requests.get(thumbnail_url).content
-            await message.reply_photo(thumb)
-
-        os.remove(file_name)  # Remove file after sending
-
-        # Log in dump chat
-        if DUMP_CHAT_ID:
-            await bot.send_message(DUMP_CHAT_ID, f"Video downloaded from {url}")
-
-    except Exception as e:
-        await message.reply_text(f"Error: {str(e)}")
-
-def progress_hook(d):
-    if d['status'] == 'finished':
-        file_size = d.get('total_bytes', 'unknown')
-        file_size_str = f"{file_size / (1024 * 1024):.2f} MB" if file_size != 'unknown' else 'unknown'
-        print(f"Done downloading {file_size_str}!")
-
-# Run the bot
-bot.run()
+if __name__ == "__main__":
+    app.run()
