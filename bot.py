@@ -1,4 +1,5 @@
-from pyrogram import Client, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
+from pyrogram import Client
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 
 app = Client("my_bot", api_id="your_api_id", api_hash="your_api_hash", bot_token="your_bot_token")
 
