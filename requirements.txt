@@ -1,8 +1,6 @@
 flask
 gunicorn
-pyrogram
-tgcrypto
-requests
-tqdm
-python-dotenv
-yt-dlp
+pyrogram==2.0.99
+yt-dlp==2024.9.2
+requests==2.28.2
+tqdm==4.65.0
