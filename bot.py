@@ -16,7 +16,7 @@ async def start(_, message: Message):
     await message.reply_text("Hello! Send me a video URL to download.")
 
 # Video download from URL
-@bot.on_message(filters.text & ~filters.edited)
+@bot.on_message(filters.text)
 async def download_video(_, message: Message):
     url = message.text
     await message.reply_text(f"Downloading video from: {url}")
