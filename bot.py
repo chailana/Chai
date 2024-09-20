@@ -1,7 +1,7 @@
 import os
 import yt_dlp
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, MessageHandler, filters, CallbackContext
 
 # Set your bot token here
 BOT_TOKEN = 'YOUR_BOT_TOKEN'
@@ -42,7 +42,7 @@ def main():
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    dp.add_handler(MessageHandler(filters.text & ~filters.command, handle_message))
 
     updater.start_polling()
     updater.idle()
