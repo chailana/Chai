@@ -18,6 +18,7 @@ def download_file(url):
         'outtmpl': 'downloaded_file',  # Save the file with this name
         'format': 'best',  # Download the best available quality
         'noplaylist': True,  # Prevent downloading playlists
+        'progress_hooks': [progress_hook],  # Set the progress hook
     }
 
     try:
@@ -28,6 +29,14 @@ def download_file(url):
         print(f"An error occurred: {str(e)}")
         return None
 
+def progress_hook(d):
+    if d['status'] == 'downloading':
+        total_size = d.get('total_bytes', None)
+        downloaded_size = d.get('downloaded_bytes', None)
+        if total_size and downloaded_size:
+            progress = downloaded_size / total_size * 100
+            print(f"Download progress: {progress:.2f}%")
+
 async def upload_file(update: Update, context: CallbackContext):
     url = update.message.text
     chat_id = update.message.chat.id
@@ -37,10 +46,10 @@ async def upload_file(update: Update, context: CallbackContext):
     try:
         file_path = download_file(url)
         if file_path and os.path.exists(file_path):
+            await update.message.reply_text("Upload started...")
             with open(file_path, 'rb') as f:
-                await update.message.reply_text("Upload started...")
                 await context.bot.send_document(chat_id, f)
-                await update.message.reply_text("Upload completed!")
+            await update.message.reply_text("Upload completed!")
         else:
             await update.message.reply_text("Failed to download the file.")
     except Exception as e:
