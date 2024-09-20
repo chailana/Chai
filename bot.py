@@ -12,6 +12,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 # Create downloads directory if it doesn't exist
 os.makedirs('downloads', exist_ok=True)
 
+# /start command handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Welcome to the Download Bot! 🎉\n"
@@ -19,6 +20,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/help for more information. 📚"
     )
 
+# /help command handler
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Here are the commands you can use:\n"
@@ -27,13 +29,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "Just send a URL to download files! 🚀"
     )
 
+# File download handler
 async def download_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     url = update.message.text
     context.user_data['last_url'] = url  # Save URL for later use
     await update.message.reply_text("Downloading... ⏳")
 
     try:
-        if url.endswith(('.mp4', '.mkv', 'youtube.com')):
+        if url.endswith(('.mp4', '.mkv', 'youtube.com', 'youtu.be')):
             if 'youtube.com' in url or 'youtu.be' in url:
                 yt = YouTube(url)
                 video_streams = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc()
@@ -43,6 +46,7 @@ async def download_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 await update.message.reply_text("Choose quality:", reply_markup=reply_markup)
                 return
             
+            # Handle direct video file download
             response = requests.get(url, stream=True)
             file_name = os.path.join('downloads', url.split("/")[-1])
             total_length = response.headers.get('content-length')
@@ -59,6 +63,7 @@ async def download_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                         percent = int(100 * dl / total_length)
                         await message.edit_text(f"Download progress: {percent}%")
             
+            # Generate and send video thumbnail
             clip = VideoFileClip(file_name)
             thumbnail_name = f"{file_name}.jpg"
             clip.save_frame(thumbnail_name, t=1)
@@ -66,6 +71,7 @@ async def download_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             os.remove(thumbnail_name)
 
         elif url.endswith('.pdf'):
+            # Handle PDF download
             response = requests.get(url, stream=True)
             file_name = os.path.join('downloads', url.split("/")[-1])
             with open(file_name, 'wb') as f:
@@ -84,6 +90,7 @@ async def download_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if os.path.exists(file_name):
             os.remove(file_name)
 
+# Callback handler for video quality selection
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
@@ -107,14 +114,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     except Exception as e:
         await query.message.reply_text(f"An error occurred: {str(e)}")
 
+# Main function to start the bot
 def main() -> None:
     application = Application.builder().token("7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE").build()
 
+    # Handlers for commands and messages
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_file))
     application.add_handler(CallbackQueryHandler(button_callback))
 
+    # Start the bot
     application.run_polling()
 
 if __name__ == '__main__':
