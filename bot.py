@@ -98,7 +98,7 @@ def main() -> None:
 
     updater.dispatcher.add_handler(CommandHandler("start", start))
     updater.dispatcher.add_handler(CommandHandler("help", help_command))
-    updater.dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, download_file))
+    updater.dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_file))
     updater.dispatcher.add_handler(CallbackQueryHandler(button_callback))
 
     updater.start_polling()
