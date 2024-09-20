@@ -4,7 +4,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
 
 # Set your bot token here
-BOT_TOKEN = 'YOUR_BOT_TOKEN'
+BOT_TOKEN = '7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE'  # Replace with your actual bot token
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Send me a video URL!')
@@ -66,7 +66,7 @@ async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.text & ~filters.command, handle_message))  # Lowercase filters
     app.add_handler(CallbackQueryHandler(button_handler))
 
     await app.run_polling()
