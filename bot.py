@@ -1,7 +1,7 @@
 import os
 import yt_dlp
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, filters, CallbackContext
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # Set your bot token here
 BOT_TOKEN = 'YOUR_BOT_TOKEN'
@@ -9,40 +9,65 @@ BOT_TOKEN = 'YOUR_BOT_TOKEN'
 def start(update: Update, context: CallbackContext):
     update.message.reply_text('Send me a video URL!')
 
-def download_video(url: str):
+def get_formats(url: str):
+    with yt_dlp.YoutubeDL() as ydl:
+        info_dict = ydl.extract_info(url, download=False)
+        formats = info_dict.get('formats', [])
+        available_formats = {f['format_id']: f['resolution'] for f in formats if 'resolution' in f}
+        return available_formats
+
+def format_buttons(format_options):
+    buttons = [[InlineKeyboardButton(text=resolution, callback_data=format_id) for format_id, resolution in format_options.items()]]
+    return InlineKeyboardMarkup(buttons)
+
+def handle_message(update: Update, context: CallbackContext):
+    url = update.message.text
+    update.message.reply_text('Fetching available formats...')
+    
+    try:
+        formats = get_formats(url)
+        if formats:
+            reply_markup = format_buttons(formats)
+            update.message.reply_text('Select a video format:', reply_markup=reply_markup)
+        else:
+            update.message.reply_text('No formats available.')
+    except Exception as e:
+        update.message.reply_text(f'Error: {str(e)}')
+
+def download_video(url: str, format_id: str):
     ydl_opts = {
-        'format': 'best',
+        'format': format_id,
         'outtmpl': 'downloads/%(title)s.%(ext)s',
         'noplaylist': True,
-        'postprocessors': [{
-            'key': 'FFmpegThumbnail',
-            'already_have_thumbnail': True,
-        }]
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info_dict = ydl.extract_info(url, download=True)
         video_title = info_dict.get('title', None)
-        thumbnail = info_dict.get('thumbnail', None)
-        return f'downloads/{video_title}.{info_dict["ext"]}', thumbnail
+        return f'downloads/{video_title}.{info_dict["ext"]}'
 
-def handle_message(update: Update, context: CallbackContext):
-    url = update.message.text
-    update.message.reply_text('Downloading your video...')
-    
-    try:
-        video_file, thumbnail = download_video(url)
-        with open(video_file, 'rb') as video:
-            update.message.reply_video(video, caption='Here is your video!', thumb=thumbnail)
-    except Exception as e:
-        update.message.reply_text(f'Error: {str(e)}')
+def button_handler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    query.answer()
+    format_id = query.data
+    url = context.user_data.get('video_url')
+
+    if url:
+        update.callback_query.edit_message_text('Downloading your video...')
+        try:
+            video_file = download_video(url, format_id)
+            with open(video_file, 'rb') as video:
+                query.message.reply_video(video, caption='Here is your video!')
+        except Exception as e:
+            query.message.reply_text(f'Error: {str(e)}')
 
 def main():
-    updater = Updater(BOT_TOKEN)
+    updater = Updater(BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(filters.text & ~filters.command, handle_message))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    dp.add_handler(CallbackQueryHandler(button_handler))
 
     updater.start_polling()
     updater.idle()
