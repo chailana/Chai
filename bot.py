@@ -114,7 +114,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.message.reply_text(f"An error occurred: {str(e)}")
 
 def main() -> None:
-    updater = Updater("YOUR_TELEGRAM_BOT_TOKEN")
+    updater = Updater("7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE")
 
     updater.dispatcher.add_handler(CommandHandler("start", start))
     updater.dispatcher.add_handler(CommandHandler("help", help_command))
