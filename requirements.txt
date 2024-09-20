@@ -1,6 +1,8 @@
 flask
 gunicorn
-python-telegram-bot
-moviepy
-requests
+pyrogram
 pytube
+youtube_dl
+requests
+python-dotenv
+ffmpeg-python
