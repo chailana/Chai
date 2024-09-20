@@ -53,7 +53,7 @@ def main():
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, upload_file))
+    dp.add_handler(MessageHandler(filters.text & ~filters.command, upload_file))
 
     updater.start_polling()
     updater.idle()
