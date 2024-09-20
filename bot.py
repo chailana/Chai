@@ -49,7 +49,7 @@ def upload_file(update: Update, context: CallbackContext):
             os.remove(file_path)
 
 def main():
-    updater = Updater(TOKEN, use_context=True)
+    updater = Updater(TOKEN)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
