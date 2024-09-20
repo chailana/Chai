@@ -2,7 +2,7 @@ import logging
 import os
 import requests
 from moviepy.editor import VideoFileClip
-from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from pytube import YouTube
 
@@ -34,7 +34,6 @@ async def download_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     try:
         if url.endswith(('.mp4', '.mkv', 'youtube.com')):
-            # Handle YouTube links
             if 'youtube.com' in url or 'youtu.be' in url:
                 yt = YouTube(url)
                 video_streams = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc()
@@ -44,7 +43,6 @@ async def download_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 await update.message.reply_text("Choose quality:", reply_markup=reply_markup)
                 return
             
-            # Downloading other video types directly
             response = requests.get(url, stream=True)
             file_name = os.path.join('downloads', url.split("/")[-1])
             total_length = response.headers.get('content-length')
@@ -61,13 +59,10 @@ async def download_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                         percent = int(100 * dl / total_length)
                         await message.edit_text(f"Download progress: {percent}%")
             
-            # Extract thumbnail
             clip = VideoFileClip(file_name)
             thumbnail_name = f"{file_name}.jpg"
-            clip.save_frame(thumbnail_name, t=1)  # Save thumbnail at 1 second
+            clip.save_frame(thumbnail_name, t=1)
             await update.message.reply_photo(photo=open(thumbnail_name, 'rb'), caption="Download complete! 🎉")
-
-            # Cleanup
             os.remove(thumbnail_name)
 
         elif url.endswith('.pdf'):
@@ -102,7 +97,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         video_stream = yt.streams.filter(res=quality, file_extension='mp4').first()
         
         if video_stream:
-            # Download video with progress
             file_path = os.path.join('downloads', video_stream.default_filename)
             video_stream.download(output_path='downloads')
             await query.message.reply_text("Download complete! 🎉")
@@ -114,15 +108,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.message.reply_text(f"An error occurred: {str(e)}")
 
 def main() -> None:
-    updater = Updater("7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE")
+    application = Application.builder().token("7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE").build()
 
-    updater.dispatcher.add_handler(CommandHandler("start", start))
-    updater.dispatcher.add_handler(CommandHandler("help", help_command))
-    updater.dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_file))
-    updater.dispatcher.add_handler(CallbackQueryHandler(button_callback))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_file))
+    application.add_handler(CallbackQueryHandler(button_callback))
 
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
