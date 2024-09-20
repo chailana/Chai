@@ -38,7 +38,7 @@ def handle_message(update: Update, context: CallbackContext):
         update.message.reply_text(f'Error: {str(e)}')
 
 def main():
-    updater = Updater(BOT_TOKEN, use_context=True)
+    updater = Updater(BOT_TOKEN)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
