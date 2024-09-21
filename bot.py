@@ -5,7 +5,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 import asyncio
 
 # Set your bot token here
-BOT_TOKEN = '7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE'  # Replace with your actual bot token
+BOT_TOKEN = '7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE'
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Send me a video URL!')
@@ -30,7 +30,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if formats:
             reply_markup = format_buttons(formats)
             await update.message.reply_text('Select a video format:', reply_markup=reply_markup)
-            context.user_data['video_url'] = url  # Store URL for later use
+            context.user_data['video_url'] = url
         else:
             await update.message.reply_text('No formats available.')
     except Exception as e:
@@ -66,7 +66,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(button_handler))
@@ -74,5 +73,5 @@ async def main():
     await app.run_polling()
 
 if __name__ == '__main__':
-    os.makedirs('downloads', exist_ok=True)  # Create downloads directory
-    asyncio.run(main())  # Run the main function directly
+    os.makedirs('downloads', exist_ok=True)
+    asyncio.run(main())
