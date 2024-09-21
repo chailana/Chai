@@ -2,4 +2,4 @@ flask
 gunicorn
 python-telegram-bot
 yt-dlp
-request
+requests
