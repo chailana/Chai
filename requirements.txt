@@ -3,4 +3,4 @@ gunicorn
 python-telegram-bot
 yt-dlp
 requests
-ffmpeg
+httpx
