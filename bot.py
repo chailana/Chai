@@ -2,6 +2,7 @@ import logging
 import os
 import requests
 import yt_dlp
+import asyncio  # Import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
@@ -134,7 +135,7 @@ def get_video_info(url):
     return title, size, thumbnail
 
 def main():
-    application = ApplicationBuilder().token('6985164126:AAF2wxioikBvrlzzBlSklXqNpO8jG-eyaVY').build()
+    application = ApplicationBuilder().token('YOUR_TELEGRAM_BOT_API_TOKEN').build()
 
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('download', download_and_send))
