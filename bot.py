@@ -4,6 +4,7 @@ import yt_dlp
 import asyncio
 import math
 import time
+import hashlib
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
@@ -13,6 +14,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s', level=loggi
 # Initialize user settings and history
 user_settings = {}
 download_history = {}
+url_format_mapping = {}  # To store original URL and format ID mapping
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Welcome! Use /download <URL> to download videos. Available qualities will be listed if needed.')
@@ -80,19 +82,28 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     formats = get_available_formats(url)
     if formats:
-        await send_format_options(update, formats, url)
+        # Store mapping for later use
+        url_hash = hashlib.md5(url.encode()).hexdigest()[:10]
+        for f in formats:
+            format_id = f['format_id']
+            format_hash = hashlib.md5(format_id.encode()).hexdigest()[:10]
+            url_format_mapping[f"{url_hash}:{format_hash}"] = (url, format_id)
+
+        await send_format_options(update, formats, url_hash)
     else:
         await update.message.reply_text("No available formats found for this video.")
 
-async def send_format_options(update: Update, formats, url):
+async def send_format_options(update: Update, formats, url_hash):
     keyboard = []
     for f in formats:
         format_id = f['format_id']
         format_note = f.get('format_note', f'Quality: {f.get("width", "Unknown")}x{f.get("height", "Unknown")}')
         size = f.get('filesize', 'Unknown size')  # Get the file size if available
+
+        # Hash the format_id
+        format_hash = hashlib.md5(format_id.encode()).hexdigest()[:10]  # Shorten to first 10 characters
         
-        # Limit the size of the callback data
-        callback_data = f"download:{url}:{format_id[:20]}"  # Shorten format_id if necessary
+        callback_data = f"download:{url_hash}:{format_hash}"  # Use hashes for callback data
         button_text = f"{format_id} - {format_note} - {size}" if size != 'Unknown size' else f"{format_id} - {format_note}"
         button = InlineKeyboardButton(text=button_text, callback_data=callback_data)
         keyboard.append([button])
@@ -105,11 +116,16 @@ async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_
     query = update.callback_query
     query.answer()  # Acknowledge the button press
     data = query.data.split(':')
-    
+
     if data[0] == "download":
-        url = data[1]
-        chosen_format = data[2]
-        await download_video(update, url, chosen_format)
+        url_hash = data[1]
+        format_hash = data[2]
+        original_url, chosen_format = url_format_mapping.get(f"{url_hash}:{format_hash}", (None, None))
+        
+        if original_url and chosen_format:
+            await download_video(update, original_url, chosen_format)
+        else:
+            await query.message.reply_text("Error retrieving the video information.")
     elif data[0] == "close":
         await query.message.reply_text("Selection closed.")
 
