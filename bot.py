@@ -9,11 +9,32 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Callb
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s', level=logging.INFO)
 
-# Initialize user settings
+# Initialize user settings and history
 user_settings = {}
+download_history = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('Welcome! Use /download <URL> <quality> to download videos. Available qualities: best, worst.')
+    await update.message.reply_text('Welcome! Use /download <URL> <quality> to download videos. Available qualities: best, worst, or specify a quality.')
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = (
+        "Available commands:\n"
+        "/start - Start the bot\n"
+        "/download <URL> <quality> - Download a video (e.g., /download <url> best)\n"
+        "/settings - View or change your settings\n"
+        "/help - Show this help message\n"
+        "/history - Show your download history"
+    )
+    await update.message.reply_text(help_text)
+
+async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    history = download_history.get(user_id, [])
+    if not history:
+        await update.message.reply_text("No download history found.")
+    else:
+        history_text = "Download History:\n" + "\n".join(history)
+        await update.message.reply_text(history_text)
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
@@ -50,7 +71,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 2:
-        await update.message.reply_text('Please provide a URL and quality (best or worst).')
+        await update.message.reply_text('Please provide a URL and quality (best, worst, or specify a quality).')
         return
 
     url = context.args[0]
@@ -65,14 +86,14 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     upload_thumbnail = user_settings[user_id]['upload_thumbnail']
 
     ydl_opts = {
-        'format': 'bestvideo+bestaudio/best' if quality == 'best' else 'worst',
+        'format': quality,
         'outtmpl': f'{title}.%(ext)s',
         'quiet': True,
         'noplaylist': True,
         'progress_hooks': [lambda d: update_progress(update, d)],
     }
 
-    await update.message.reply_text("wair dawg trying to download and upload the video😎")
+    await update.message.reply_text("📤 Uᴘʟᴏᴀᴅɪɴɢ Pʟᴇᴀsᴇ Wᴀɪᴛ\n\n[░░░░░░░░░░░░░░░░░░░░]")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -97,6 +118,11 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if upload_thumbnail:
             await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open(thumbnail_path, 'rb'))
+
+        # Add to download history
+        if user_id not in download_history:
+            download_history[user_id] = []
+        download_history[user_id].append(f"{title} - {size}")
 
     except Exception as e:
         await update.message.reply_text(f'Error: {str(e)}')
@@ -140,8 +166,10 @@ def main():
     application = ApplicationBuilder().token('6985164126:AAF2wxioikBvrlzzBlSklXqNpO8jG-eyaVY').build()
 
     application.add_handler(CommandHandler('start', start))
+    application.add_handler(CommandHandler('help', help_command))
     application.add_handler(CommandHandler('download', download_and_send))
     application.add_handler(CommandHandler('settings', settings))
+    application.add_handler(CommandHandler('history', history_command))
     application.add_handler(CallbackQueryHandler(button_handler))
 
     application.run_polling()
