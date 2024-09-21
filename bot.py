@@ -25,6 +25,7 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'outtmpl': f'{title}.%(ext)s',
         'quiet': True,
         'noplaylist': True,
+        'progress_hooks': [lambda d: update_progress(update, d)],
     }
 
     await update.message.reply_text("📤 Uᴘʟᴏᴀᴅɪɴɢ Pʟᴇᴀsᴇ Wᴀɪᴛ\n\n[░░░░░░░░░░░░░░░░░░░░]")
@@ -32,7 +33,6 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(url, download=True)
-            total_size = info_dict.get('filesize', None)
             title = info_dict.get('title', 'No Title')
 
         # Download the thumbnail
@@ -41,11 +41,10 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with open(thumbnail_path, 'wb') as f:
             f.write(thumbnail_response.content)
 
-        # Send the video with thumbnail
+        # Send the video
         video_path = f"{title}.mp4"
         await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_path, 'rb'),
-                                      caption=f'Title: {title}\nSize: {size}',
-                                      thumb=open(thumbnail_path, 'rb'))
+                                      caption=f'Title: {title}\nSize: {size}')
 
     except Exception as e:
         await update.message.reply_text(f'Error: {str(e)}')
@@ -56,6 +55,17 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
             os.remove(thumbnail_path)
         except:
             pass
+
+def update_progress(update, progress):
+    if progress['status'] == 'downloading':
+        total_size = progress.get('total_bytes', None)
+        downloaded_size = progress.get('downloaded_bytes', 0)
+
+        if total_size:
+            percent = downloaded_size / total_size * 100
+            progress_message = f"Download progress: {percent:.2f}%"
+            # Update the progress message in the chat
+            asyncio.run(update.message.reply_text(progress_message))
 
 def get_video_info(url):
     ydl_opts = {
@@ -74,7 +84,7 @@ def get_video_info(url):
     return title, size, thumbnail
 
 def main():
-    application = ApplicationBuilder().token('7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE').build()
+    application = ApplicationBuilder().token('YOUR_TOKEN_HERE').build()
 
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('download', download_and_send))
