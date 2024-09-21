@@ -2,7 +2,7 @@ import logging
 import os
 import requests
 import yt_dlp
-from telegram import Update, ChatAction
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import asyncio
 
