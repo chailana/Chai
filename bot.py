@@ -7,9 +7,11 @@ import asyncio
 # Set your bot token here
 BOT_TOKEN = '7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE'  # Replace with your actual bot token
 
+# /start command handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Send me a video URL!')
 
+# Fetch available formats using yt-dlp
 async def get_formats(url: str):
     with yt_dlp.YoutubeDL() as ydl:
         info_dict = ydl.extract_info(url, download=False)
@@ -17,10 +19,12 @@ async def get_formats(url: str):
         available_formats = {f['format_id']: f['resolution'] for f in formats if 'resolution' in f}
         return available_formats
 
+# Create buttons for video formats
 def format_buttons(format_options):
     buttons = [[InlineKeyboardButton(text=resolution, callback_data=format_id) for format_id, resolution in format_options.items()]]
     return InlineKeyboardMarkup(buttons)
 
+# Handle messages with video URLs
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text
     await update.message.reply_text('Fetching available formats...')
@@ -36,6 +40,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f'Error: {str(e)}')
 
+# Download video using yt-dlp
 async def download_video(url: str, format_id: str):
     ydl_opts = {
         'format': format_id,
@@ -48,6 +53,7 @@ async def download_video(url: str, format_id: str):
         video_title = info_dict.get('title', None)
         return f'downloads/{video_title}.{info_dict["ext"]}'
 
+# Handle button clicks for format selection
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -63,15 +69,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await query.message.reply_text(f'Error: {str(e)}')
 
+# Main function to run the bot
 async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # Handlers
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))  # Uppercase Filters
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    await app.run_polling()  # Handles initialization, starting, and shutdown
+    await app.run_polling()
 
+# Entry point of the script
 if __name__ == '__main__':
-    os.makedirs('downloads', exist_ok=True)
-    asyncio.run(main())  # Correct event loop handling
+    os.makedirs('downloads', exist_ok=True)  # Create downloads directory
+    try:
+        loop = asyncio.get_running_loop()
+        loop.run_until_complete(main())
+    except RuntimeError:
+        asyncio.run(main())
