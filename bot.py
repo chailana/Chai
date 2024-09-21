@@ -87,7 +87,7 @@ async def send_format_options(update: Update, formats, url):
     keyboard = []
     for f in formats:
         format_id = f['format_id']
-        format_note = f.get('format_note', f'Quality: {f["width"]}x{f["height"]}')  # Default note if not provided
+        format_note = f.get('format_note', f'Quality: {f.get("width", "Unknown")}x{f.get("height", "Unknown")}')
         button = InlineKeyboardButton(text=f"{format_id} - {format_note}", callback_data=f"download:{url}:{format_id}")
         keyboard.append([button])
 
@@ -111,6 +111,7 @@ async def download_video(update: Update, url: str, format_id: str):
         'outtmpl': '%(title)s.%(ext)s',
         'quiet': True,
         'noplaylist': True,
+        'progress_hooks': [lambda d: update_progress(update, d)],
     }
 
     await update.message.reply_text("📤 Uᴘʟᴏᴀᴅɪɴɢ Pʟᴇᴀsᴇ Wᴀɪᴛ\n\n[░░░░░░░░░░░░░░░░░░░░]")
@@ -136,6 +137,32 @@ async def download_video(update: Update, url: str, format_id: str):
             os.remove(video_path)
         except:
             pass
+
+def update_progress(update, progress):
+    if progress['status'] == 'finished':
+        return
+    
+    if progress['status'] == 'downloading':
+        total_size = progress.get('total_bytes', 1)  # Avoid division by zero
+        downloaded_size = progress.get('downloaded_bytes', 0)
+
+        percent = downloaded_size / total_size * 100
+        bar_length = 20  # Length of the progress bar
+        filled_length = int(bar_length * percent // 100)
+        bar = '█' * filled_length + '░' * (bar_length - filled_length)
+
+        speed = progress.get('speed', 0) / (1024 * 1024)  # Convert to MB/s
+        speed_text = f"🏎️ Sᴘᴇᴇᴅ : {speed:.2f} MB/s"
+        done_text = f"✅ Dᴏɴᴇ : {downloaded_size / (1024 * 1024):.2f} MB"
+        total_size_text = f"🟰 Tᴏᴛᴀʟ sɪᴢᴇ  : {total_size / (1024 * 1024):.2f} MB"
+        time_left_text = "⏳ Tɪᴍᴇ ʟᴇғᴛ : N/A"  # Placeholder for time left
+
+        # Calculate remaining time
+        if progress.get('eta') is not None:
+            time_left_text = f"⏳ Tɪᴍᴇ ʟᴇғᴛ : {progress['eta']}s"
+
+        # Update the message
+        update.message.reply_text(f"📤 Uᴘʟᴏᴀᴅɪɴɢ Pʟᴇᴀsᴇ Wᴀɪᴛ\n\n[{bar}]\n\n{speed_text}\n{done_text}\n{total_size_text}\n{time_left_text}")
 
 def get_available_formats(url):
     ydl_opts = {
