@@ -4,7 +4,6 @@ import requests
 import yt_dlp
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-import asyncio
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -28,9 +27,8 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'noplaylist': True,
     }
 
-    # Download process animation
     await update.message.reply_text("📤 Uᴘʟᴏᴀᴅɪɴɢ Pʟᴇᴀsᴇ Wᴀɪᴛ\n\n[░░░░░░░░░░░░░░░░░░░░]")
-    
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(url, download=True)
@@ -42,9 +40,6 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
         thumbnail_path = f"{title}_thumbnail.jpg"
         with open(thumbnail_path, 'wb') as f:
             f.write(thumbnail_response.content)
-
-        # Prepare upload animation
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_VIDEO)
 
         # Send the video with thumbnail
         video_path = f"{title}.mp4"
