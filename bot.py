@@ -1,6 +1,5 @@
 import logging
 import os
-import requests
 import yt_dlp
 import asyncio
 import math
@@ -91,8 +90,11 @@ async def send_format_options(update: Update, formats, url):
         format_id = f['format_id']
         format_note = f.get('format_note', f'Quality: {f.get("width", "Unknown")}x{f.get("height", "Unknown")}')
         size = f.get('filesize', 'Unknown size')  # Get the file size if available
+        
+        # Limit the size of the callback data
+        callback_data = f"download:{url}:{format_id[:20]}"  # Shorten format_id if necessary
         button_text = f"{format_id} - {format_note} - {size}" if size != 'Unknown size' else f"{format_id} - {format_note}"
-        button = InlineKeyboardButton(text=button_text, callback_data=f"download:{url}:{format_id}")
+        button = InlineKeyboardButton(text=button_text, callback_data=callback_data)
         keyboard.append([button])
 
     keyboard.append([InlineKeyboardButton("CLOSE", callback_data="close")])  # Add a close button
