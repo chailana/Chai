@@ -66,7 +66,7 @@ async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))  # Lowercase filters
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))  # Correct uppercase filters
     app.add_handler(CallbackQueryHandler(button_handler))
 
     await app.run_polling()
@@ -74,4 +74,7 @@ async def main():
 if __name__ == '__main__':
     os.makedirs('downloads', exist_ok=True)
     import asyncio
-    asyncio.run(main())
+    try:
+        asyncio.get_event_loop().run_until_complete(main())  # Use existing event loop
+    except RuntimeError:
+        pass  # If already running, skip this
