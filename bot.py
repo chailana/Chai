@@ -14,13 +14,13 @@ user_settings = {}
 download_history = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('Welcome! Use /download <URL> <quality> to download videos. Available qualities: best, worst, or specify a quality.')
+    await update.message.reply_text('Welcome! Use /download <URL> to download videos. Available qualities will be listed if needed.')
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
         "Available commands:\n"
         "/start - Start the bot\n"
-        "/download <URL> <quality> - Download a video (e.g., /download <url> best)\n"
+        "/download <URL> - Download a video\n"
         "/settings - View or change your settings\n"
         "/help - Show this help message\n"
         "/history - Show your download history"
@@ -70,27 +70,47 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await settings(update, context)
 
 async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if len(context.args) < 2:
-        await update.message.reply_text('Please provide a URL and quality (best, worst, or specify a quality).')
+    if len(context.args) < 1:
+        await update.message.reply_text('Please provide a URL to download the video.')
         return
 
     url = context.args[0]
-    quality = context.args[1]
-    title, size, thumbnail_url = get_video_info(url)
-
     user_id = update.effective_chat.id
-    if user_id not in user_settings:
-        user_settings[user_id] = {'upload_as_video': True, 'upload_thumbnail': True}
 
-    upload_as_video = user_settings[user_id]['upload_as_video']
-    upload_thumbnail = user_settings[user_id]['upload_thumbnail']
+    formats = get_available_formats(url)
+    if formats:
+        await send_format_options(update, formats, url)
+    else:
+        await update.message.reply_text("No available formats found for this video.")
 
+async def send_format_options(update: Update, formats, url):
+    keyboard = []
+    for f in formats:
+        format_id = f['format_id']
+        format_note = f.get('format_note', f'Quality: {f["width"]}x{f["height"]}')  # Default note if not provided
+        button = InlineKeyboardButton(text=f"{format_id} - {format_note}", callback_data=f"download:{url}:{format_id}")
+        keyboard.append([button])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Choose a format:", reply_markup=reply_markup)
+
+async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    query.answer()  # Acknowledge the button press
+    data = query.data.split(':')
+    
+    if data[0] == "download":
+        url = data[1]
+        chosen_format = data[2]
+        await download_video(update, url, chosen_format)
+
+async def download_video(update: Update, url: str, format_id: str):
+    user_id = update.effective_chat.id
     ydl_opts = {
-        'format': quality,
-        'outtmpl': f'{title}.%(ext)s',
+        'format': format_id,
+        'outtmpl': '%(title)s.%(ext)s',
         'quiet': True,
         'noplaylist': True,
-        'progress_hooks': [lambda d: update_progress(update, d)],
     }
 
     await update.message.reply_text("📤 Uᴘʟᴏᴀᴅɪɴɢ Pʟᴇᴀsᴇ Wᴀɪᴛ\n\n[░░░░░░░░░░░░░░░░░░░░]")
@@ -100,29 +120,13 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
             info_dict = ydl.extract_info(url, download=True)
             title = info_dict.get('title', 'No Title')
 
-        # Download the thumbnail if enabled
-        if upload_thumbnail:
-            thumbnail_response = requests.get(thumbnail_url)
-            thumbnail_path = f"{title}_thumbnail.jpg"
-            with open(thumbnail_path, 'wb') as f:
-                f.write(thumbnail_response.content)
-
-        # Send the video or file based on user settings
         video_path = f"{title}.mp4"
-        if upload_as_video:
-            await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_path, 'rb'),
-                                          caption=f'Title: {title}\nSize: {size}')
-        else:
-            await context.bot.send_document(chat_id=update.effective_chat.id, document=open(video_path, 'rb'),
-                                             caption=f'Title: {title}\nSize: {size}')
-
-        if upload_thumbnail:
-            await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open(thumbnail_path, 'rb'))
+        await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_path, 'rb'), caption=f'Title: {title}')
 
         # Add to download history
         if user_id not in download_history:
             download_history[user_id] = []
-        download_history[user_id].append(f"{title} - {size}")
+        download_history[user_id].append(f"{title}")
 
     except Exception as e:
         await update.message.reply_text(f'Error: {str(e)}')
@@ -130,37 +134,19 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Clean up downloaded files
         try:
             os.remove(video_path)
-            if upload_thumbnail:
-                os.remove(thumbnail_path)
         except:
             pass
 
-def update_progress(update, progress):
-    if progress['status'] == 'downloading':
-        total_size = progress.get('total_bytes', None)
-        downloaded_size = progress.get('downloaded_bytes', 0)
-
-        if total_size:
-            percent = downloaded_size / total_size * 100
-            progress_message = f"Download progress: {percent:.2f}%"
-            # Update the progress message in the chat
-            asyncio.create_task(update.message.reply_text(progress_message))
-
-def get_video_info(url):
+def get_available_formats(url):
     ydl_opts = {
-        'format': 'bestvideo+bestaudio/best',
+        'format': 'best',
         'quiet': True,
         'noplaylist': True
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
-
-    title = info.get('title', 'No title')
-    size = info.get('filesize', 'Unknown size')
-    thumbnail = info.get('thumbnail', '')
-
-    return title, size, thumbnail
+        return info.get('formats', [])
 
 def main():
     application = ApplicationBuilder().token('6985164126:AAF2wxioikBvrlzzBlSklXqNpO8jG-eyaVY').build()
@@ -171,6 +157,7 @@ def main():
     application.add_handler(CommandHandler('settings', settings))
     application.add_handler(CommandHandler('history', history_command))
     application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(CallbackQueryHandler(handle_format_selection, pattern=r'download:\S+:\S+'))
 
     application.run_polling()
 
