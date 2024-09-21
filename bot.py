@@ -2,6 +2,7 @@ import os
 import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
+import asyncio
 
 # Set your bot token here
 BOT_TOKEN = '7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE'  # Replace with your actual bot token
@@ -66,15 +67,15 @@ async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))  # Correct uppercase filters
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))  # Uppercase Filters
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    await app.run_polling()
+    await app.initialize()  # Ensure app is properly initialized
+    await app.start()  # Start bot
+    await app.updater.start_polling()  # Poll updates
+    await app.stop()  # Stop the bot
+    await app.shutdown()  # Shutdown bot properly
 
 if __name__ == '__main__':
     os.makedirs('downloads', exist_ok=True)
-    import asyncio
-    try:
-        asyncio.get_event_loop().run_until_complete(main())  # Use existing event loop
-    except RuntimeError:
-        pass  # If already running, skip this
+    asyncio.run(main())  # Correct event loop handling
