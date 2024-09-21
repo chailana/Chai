@@ -84,7 +84,7 @@ def get_video_info(url):
     return title, size, thumbnail
 
 def main():
-    application = ApplicationBuilder().token('YOUR_TOKEN_HERE').build()
+    application = ApplicationBuilder().token('7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE').build()
 
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('download', download_and_send))
