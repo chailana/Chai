@@ -19,5 +19,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of your application code
 COPY . .
 
-# Command to run your application with Gunicorn
+# Copy the start.sh script
+COPY start.sh .
+
+# Make the start.sh script executable
+RUN chmod +x start.sh
+
+# Command to run the start.sh script
 CMD ["bash", "start.sh"]
