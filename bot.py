@@ -66,7 +66,7 @@ async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.Text & ~filters.command, handle_message))  # Lowercase filters
+    app.add_handler(MessageHandler(filters.Text & ~filters.Command, handle_message))  # Lowercase filters
     app.add_handler(CallbackQueryHandler(button_handler))
 
     await app.run_polling()
