@@ -21,8 +21,10 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Download the video
     ydl_opts = {
-        'format': 'best',
-        'outtmpl': f'{title}.%(ext)s'
+        'format': 'bestvideo+bestaudio/best',  # Maximum quality
+        'outtmpl': f'{title}.%(ext)s',
+        'concurrent_fragment_downloads': 4,    # Speed up with parallel downloads
+        'noplaylist': True,
     }
     
     try:
@@ -54,7 +56,7 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def get_video_info(url):
     ydl_opts = {
-        'format': 'best',
+        'format': 'bestvideo+bestaudio/best',  # Maximum quality
         'quiet': True,
         'noplaylist': True
     }
