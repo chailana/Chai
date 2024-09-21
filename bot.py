@@ -2,12 +2,12 @@ import logging
 import os
 import requests
 import yt_dlp
-import asyncio  # Import asyncio
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
 # Configure logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s', level=logging.INFO)
 
 # Initialize user settings
 user_settings = {}
@@ -25,7 +25,9 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings_text += f"Upload Thumbnail: {'Enabled' if user_settings[user_id]['upload_thumbnail'] else 'Disabled'}\n"
 
     keyboard = [
-        [InlineKeyboardButton("Toggle Upload as Video", callback_data='toggle_video')],
+        [InlineKeyboardButton(
+            "Toggle Upload as Video 🎥" if user_settings[user_id]['upload_as_video'] else "Toggle Upload as File 🗃️",
+            callback_data='toggle_video')],
         [InlineKeyboardButton("Toggle Upload Thumbnail", callback_data='toggle_thumbnail')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -70,7 +72,7 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'progress_hooks': [lambda d: update_progress(update, d)],
     }
 
-    await update.message.reply_text("📤 Uᴘʟᴏᴀᴅɪɴɢ Pʟᴇᴀsᴇ Wᴀɪᴛ\n\n[░░░░░░░░░░░░░░░░░░░░]")
+    await update.message.reply_text("wair dawg trying to download and upload the video😎")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -116,7 +118,7 @@ def update_progress(update, progress):
             percent = downloaded_size / total_size * 100
             progress_message = f"Download progress: {percent:.2f}%"
             # Update the progress message in the chat
-            asyncio.run(update.message.reply_text(progress_message))
+            asyncio.create_task(update.message.reply_text(progress_message))
 
 def get_video_info(url):
     ydl_opts = {
