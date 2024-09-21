@@ -70,11 +70,7 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))  # Uppercase Filters
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    await app.initialize()  # Ensure app is properly initialized
-    await app.start()  # Start bot
-    await app.updater.start_polling()  # Poll updates
-    await app.stop()  # Stop the bot
-    await app.shutdown()  # Shutdown bot properly
+    await app.run_polling()  # Handles initialization, starting, and shutdown
 
 if __name__ == '__main__':
     os.makedirs('downloads', exist_ok=True)
