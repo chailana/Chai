@@ -2,14 +2,48 @@ import logging
 import os
 import requests
 import yt_dlp
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+# Initialize user settings
+user_settings = {}
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Welcome! Use /download <URL> <quality> to download videos. Available qualities: best, worst.')
+
+async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_chat.id
+    if user_id not in user_settings:
+        user_settings[user_id] = {'upload_as_video': True, 'upload_thumbnail': True}
+    
+    settings_text = "Current Settings:\n"
+    settings_text += f"Upload as Video: {'Enabled' if user_settings[user_id]['upload_as_video'] else 'Disabled'}\n"
+    settings_text += f"Upload Thumbnail: {'Enabled' if user_settings[user_id]['upload_thumbnail'] else 'Disabled'}\n"
+
+    keyboard = [
+        [InlineKeyboardButton("Toggle Upload as Video", callback_data='toggle_video')],
+        [InlineKeyboardButton("Toggle Upload Thumbnail", callback_data='toggle_thumbnail')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(settings_text, reply_markup=reply_markup)
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.message.chat.id
+
+    if user_id not in user_settings:
+        user_settings[user_id] = {'upload_as_video': True, 'upload_thumbnail': True}
+
+    if query.data == 'toggle_video':
+        user_settings[user_id]['upload_as_video'] = not user_settings[user_id]['upload_as_video']
+    elif query.data == 'toggle_thumbnail':
+        user_settings[user_id]['upload_thumbnail'] = not user_settings[user_id]['upload_thumbnail']
+
+    await settings(update, context)
 
 async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 2:
@@ -19,6 +53,13 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = context.args[0]
     quality = context.args[1]
     title, size, thumbnail_url = get_video_info(url)
+
+    user_id = update.effective_chat.id
+    if user_id not in user_settings:
+        user_settings[user_id] = {'upload_as_video': True, 'upload_thumbnail': True}
+
+    upload_as_video = user_settings[user_id]['upload_as_video']
+    upload_thumbnail = user_settings[user_id]['upload_thumbnail']
 
     ydl_opts = {
         'format': 'bestvideo+bestaudio/best' if quality == 'best' else 'worst',
@@ -35,16 +76,24 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
             info_dict = ydl.extract_info(url, download=True)
             title = info_dict.get('title', 'No Title')
 
-        # Download the thumbnail
-        thumbnail_response = requests.get(thumbnail_url)
-        thumbnail_path = f"{title}_thumbnail.jpg"
-        with open(thumbnail_path, 'wb') as f:
-            f.write(thumbnail_response.content)
+        # Download the thumbnail if enabled
+        if upload_thumbnail:
+            thumbnail_response = requests.get(thumbnail_url)
+            thumbnail_path = f"{title}_thumbnail.jpg"
+            with open(thumbnail_path, 'wb') as f:
+                f.write(thumbnail_response.content)
 
-        # Send the video
+        # Send the video or file based on user settings
         video_path = f"{title}.mp4"
-        await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_path, 'rb'),
-                                      caption=f'Title: {title}\nSize: {size}')
+        if upload_as_video:
+            await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_path, 'rb'),
+                                          caption=f'Title: {title}\nSize: {size}')
+        else:
+            await context.bot.send_document(chat_id=update.effective_chat.id, document=open(video_path, 'rb'),
+                                             caption=f'Title: {title}\nSize: {size}')
+
+        if upload_thumbnail:
+            await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open(thumbnail_path, 'rb'))
 
     except Exception as e:
         await update.message.reply_text(f'Error: {str(e)}')
@@ -52,7 +101,8 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Clean up downloaded files
         try:
             os.remove(video_path)
-            os.remove(thumbnail_path)
+            if upload_thumbnail:
+                os.remove(thumbnail_path)
         except:
             pass
 
@@ -84,10 +134,12 @@ def get_video_info(url):
     return title, size, thumbnail
 
 def main():
-    application = ApplicationBuilder().token('7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE').build()
+    application = ApplicationBuilder().token('YOUR_TELEGRAM_BOT_API_TOKEN').build()
 
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('download', download_and_send))
+    application.add_handler(CommandHandler('settings', settings))
+    application.add_handler(CallbackQueryHandler(button_handler))
 
     application.run_polling()
 
