@@ -3,6 +3,8 @@ import os
 import requests
 import yt_dlp
 import asyncio
+import math
+import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
@@ -88,11 +90,14 @@ async def send_format_options(update: Update, formats, url):
     for f in formats:
         format_id = f['format_id']
         format_note = f.get('format_note', f'Quality: {f.get("width", "Unknown")}x{f.get("height", "Unknown")}')
-        button = InlineKeyboardButton(text=f"{format_id} - {format_note}", callback_data=f"download:{url}:{format_id}")
+        size = f.get('filesize', 'Unknown size')  # Get the file size if available
+        button_text = f"{format_id} - {format_note} - {size}" if size != 'Unknown size' else f"{format_id} - {format_note}"
+        button = InlineKeyboardButton(text=button_text, callback_data=f"download:{url}:{format_id}")
         keyboard.append([button])
 
+    keyboard.append([InlineKeyboardButton("CLOSE", callback_data="close")])  # Add a close button
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Choose a format:", reply_markup=reply_markup)
+    await update.message.reply_text("Select the desired format or file size to upload:", reply_markup=reply_markup)
 
 async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -103,6 +108,8 @@ async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_
         url = data[1]
         chosen_format = data[2]
         await download_video(update, url, chosen_format)
+    elif data[0] == "close":
+        await query.message.reply_text("Selection closed.")
 
 async def download_video(update: Update, url: str, format_id: str):
     user_id = update.effective_chat.id
@@ -111,10 +118,10 @@ async def download_video(update: Update, url: str, format_id: str):
         'outtmpl': '%(title)s.%(ext)s',
         'quiet': True,
         'noplaylist': True,
-        'progress_hooks': [lambda d: update_progress(update, d)],
+        'progress_hooks': [lambda d: asyncio.run(progress_for_telegram(d, update))],
     }
 
-    await update.message.reply_text("📤 Uᴘʟᴏᴀᴅɪɴɢ Pʟᴇᴀsᴇ Wᴀɪᴛ\n\n[░░░░░░░░░░░░░░░░░░░░]")
+    await update.message.reply_text("📤 Uᴘʟᴏᴀᴅɪɴɢ Pʟᴇᴀsᴇ Wᴀɪᴛ...")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -138,7 +145,7 @@ async def download_video(update: Update, url: str, format_id: str):
         except:
             pass
 
-def update_progress(update, progress):
+async def progress_for_telegram(progress, update):
     if progress['status'] == 'finished':
         return
     
@@ -146,23 +153,47 @@ def update_progress(update, progress):
         total_size = progress.get('total_bytes', 1)  # Avoid division by zero
         downloaded_size = progress.get('downloaded_bytes', 0)
 
-        percent = downloaded_size / total_size * 100
-        bar_length = 20  # Length of the progress bar
-        filled_length = int(bar_length * percent // 100)
-        bar = '█' * filled_length + '░' * (bar_length - filled_length)
+        percentage = downloaded_size * 100 / total_size
+        speed = downloaded_size / (time.time() - start) if start else 0
+        bar_width = 20
+        progress_bar = "[{0}{1}] \n".format(
+            ''.join(["█" for _ in range(math.floor(percentage / (100 / bar_width)))]),
+            ''.join(["░" for _ in range(bar_width - math.floor(percentage / (100 / bar_width)))])
+        )
 
-        speed = progress.get('speed', 0) / (1024 * 1024)  # Convert to MB/s
-        speed_text = f"🏎️ Sᴘᴇᴇᴅ : {speed:.2f} MB/s"
-        done_text = f"✅ Dᴏɴᴇ : {downloaded_size / (1024 * 1024):.2f} MB"
-        total_size_text = f"🟰 Tᴏᴛᴀʟ sɪᴢᴇ  : {total_size / (1024 * 1024):.2f} MB"
-        time_left_text = "⏳ Tɪᴍᴇ ʟᴇғᴛ : N/A"  # Placeholder for time left
+        status_message = f"**Uploading...**\n\n{progress_bar}\n" \
+                         f"**Progress:** {round(percentage, 2)}%\n" \
+                         f"**Done:** {humanbytes(downloaded_size)}\n" \
+                         f"**Total Size:** {humanbytes(total_size)}\n" \
+                         f"**Speed:** {humanbytes(speed)}\n" \
+                         f"**ETA:** {TimeFormatter(milliseconds=(total_size - downloaded_size) / speed * 1000)}"
 
-        # Calculate remaining time
-        if progress.get('eta') is not None:
-            time_left_text = f"⏳ Tɪᴍᴇ ʟᴇғᴛ : {progress['eta']}s"
+        try:
+            await update.message.reply_text(status_message)
+        except Exception as e:
+            print(f"Error updating progress: {e}")
 
-        # Update the message
-        update.message.reply_text(f"📤 Uᴘʟᴏᴀᴅɪɴɢ Pʟᴇᴀsᴇ Wᴀɪᴛ\n\n[{bar}]\n\n{speed_text}\n{done_text}\n{total_size_text}\n{time_left_text}")
+def humanbytes(size):
+    if not size:
+        return ""
+    power = 1024
+    n = 0
+    Dic_powerN = {0: ' ', 1: 'K', 2: 'M', 3: 'G', 4: 'T'}
+    while size > power:
+        size /= power
+        n += 1
+    return str(round(size, 2)) + " " + Dic_powerN[n] + 'B'
+
+def TimeFormatter(milliseconds: int) -> str:
+    seconds, milliseconds = divmod(int(milliseconds), 1000)
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+    tmp = ((str(days) + "d, ") if days else "") + \
+          ((str(hours) + "h, ") if hours else "") + \
+          ((str(minutes) + "m, ") if minutes else "") + \
+          ((str(seconds) + "s, ") if seconds else "")
+    return tmp[:-2]
 
 def get_available_formats(url):
     ydl_opts = {
