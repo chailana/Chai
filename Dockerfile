@@ -20,4 +20,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Command to run your application with Gunicorn
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8000"]
+CMD ["bash", "start.sh"]
