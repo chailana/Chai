@@ -1,10 +1,19 @@
 import os
 import datetime
+import logging
+import asyncio
+import json
 from dotenv import load_dotenv
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import yt_dlp
 import motor.motor_asyncio
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+logging.getLogger("pyrogram").setLevel(logging.WARNING)
 
 load_dotenv()
 
@@ -75,31 +84,34 @@ async def send_help(client, message):
     )
     await client.send_message(message.chat.id, help_text)
 
-@bot.on_message(filters.text)
-async def handle_message(client, message):
-    url = message.text.strip()
-    if is_valid_url(url):
-        await client.send_message(message.chat.id, f"Downloading from {url}...")
+@bot.on_message(filters.private & filters.regex(pattern=".*http.*"))
+async def handle_url(bot, update):
+    logger.info(update.from_user)
+    
+    url = update.text.strip()
+    
+    # Log URL processing
+    logger.info(f"Processing URL: {url}")
+
+    # Fetch video formats using yt-dlp
+    formats = await db.get_video_formats(url)
+    
+    if formats:
+        keyboard = []
+        seen_formats = set()  # To avoid duplicates
         
-        formats = await db.get_video_formats(url)
+        for fmt in formats:
+            if 'height' in fmt and fmt['format_id'] not in seen_formats:
+                button_label = f"{fmt.get('format_note', 'No Note')} ({fmt['height']}p)"
+                button = InlineKeyboardButton(button_label, callback_data=f"quality_{fmt['format_id']}")
+                keyboard.append([button])
+                seen_formats.add(fmt['format_id'])  # Mark this format as seen
         
-        if formats:
-            keyboard = []
-            seen_formats = set()  # To avoid duplicates
-            
-            for fmt in formats:
-                if 'height' in fmt and fmt['format_id'] not in seen_formats:
-                    button_label = f"{fmt.get('format_note', 'No Note')} ({fmt['height']}p)"
-                    button = InlineKeyboardButton(button_label, callback_data=f"quality_{fmt['format_id']}")
-                    keyboard.append([button])
-                    seen_formats.add(fmt['format_id'])  # Mark this format as seen
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await client.send_message(message.chat.id, "Available quality options:", reply_markup=reply_markup)
-        else:
-            await client.send_message(message.chat.id, "Failed to retrieve video formats.")
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await bot.send_message(update.chat.id, "Available quality options:", reply_markup=reply_markup)
     else:
-        await client.send_message(message.chat.id, "Please send a valid URL.")
+        await bot.send_message(update.chat.id, "Failed to retrieve video formats.")
 
 @bot.on_callback_query(filters.regex(r"quality_"))
 async def handle_quality_selection(client, callback_query):
@@ -129,7 +141,7 @@ async def download_video(user_id, url, format_id):
             
              os.remove(final_video_file)  # Clean up the video file after sending
             
-    except Exception as e:
+     except Exception as e:
          print(f"Error downloading file: {e}")
 
 def is_valid_url(url):
