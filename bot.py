@@ -25,7 +25,7 @@ async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ydl_opts = {
         'format': 'bestvideo+bestaudio/best',
         'outtmpl': os.path.join(tempfile.gettempdir(), '%(title)s.%(ext)s'),  # Use temp directory
-        'socket_timeout': 10,
+        'socket_timeout': 100000,
     }
 
     try:
