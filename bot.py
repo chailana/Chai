@@ -62,7 +62,10 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(settings_info, reply_markup=reply_markup)
+    if hasattr(update, 'callback_query'):
+        await update.callback_query.message.reply_text(settings_info, reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(settings_info, reply_markup=reply_markup)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -74,10 +77,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == 'toggle_video':
         user_preferences[user_id]['upload_as_video'] = not user_preferences[user_id]['upload_as_video']
-        await settings(update, context)  # Refresh settings to show updated button
+        await settings(query, context)  # Pass the query object here
     elif query.data == 'toggle_thumbnail':
         user_preferences[user_id]['upload_thumbnail'] = not user_preferences[user_id]['upload_thumbnail']
-        await settings(update, context)  # Refresh settings to show updated button
+        await settings(query, context)  # Pass the query object here
 
 async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 1:
