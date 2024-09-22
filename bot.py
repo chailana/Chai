@@ -139,7 +139,12 @@ async def present_format_options(update: Update, formats, url_hash):
 
     keyboard.append([InlineKeyboardButton("❌ CLOSE", callback_data="close_download")])  # Add a close option
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("🔍 Select the preferred format or file size to upload:", reply_markup=reply_markup)
+
+    await update.message.reply_text(
+        "🔍 Select the preferred format or file size to download:\n"
+        "Choose an option below:",
+        reply_markup=reply_markup
+    )
 
 async def present_upload_format_options(update: Update, formats, url_hash):
     keyboard = []
@@ -157,7 +162,12 @@ async def present_upload_format_options(update: Update, formats, url_hash):
 
     keyboard.append([InlineKeyboardButton("❌ CLOSE", callback_data="close_upload")])  # Add a close option
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("🔍 Select the preferred format or quality to upload:", reply_markup=reply_markup)
+
+    await update.message.reply_text(
+        "🔍 Select the preferred format or quality to upload:\n"
+        "Choose an option below:",
+        reply_markup=reply_markup
+    )
 
 async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
