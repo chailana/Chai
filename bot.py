@@ -2,7 +2,7 @@
 import os
 import requests
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, MessageHandler, filters, CallbackContext
 from urllib.parse import urlparse
 
 # Load environment variables from .env file
@@ -56,7 +56,7 @@ def main() -> None:
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, process_url))
+    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_url))
 
     updater.start_polling()
     updater.idle()
