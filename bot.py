@@ -7,7 +7,10 @@ load_dotenv()
 
 API_ID = os.getenv('API_ID')  # Your API ID from https://my.telegram.org
 API_HASH = os.getenv('API_HASH')  # Your API Hash from https://my.telegram.org
-bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH)
+BOT_TOKEN = os.getenv('BOT_TOKEN')  # Your Bot Token from BotFather
+
+# Initialize the bot with API ID, API Hash, and Bot Token
+bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 @bot.on_message(filters.command("start"))
 def send_welcome(client, message):
