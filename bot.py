@@ -41,6 +41,10 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query  # Get the callback query
+    if not query:  # Check if query is None
+        return
+
+    await query.answer()  # Acknowledge the button press
     user_id = query.message.chat.id  # Use the chat ID from the query message
 
     if user_id not in user_preferences:
