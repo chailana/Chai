@@ -111,40 +111,19 @@ async def upload_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = context.args[0]
     user_id = update.effective_chat.id
 
-    await update.message.reply_text("📤 Downloading and uploading your video... Please wait.")
+    available_formats = fetch_available_formats(url)
+    if available_formats:
+        url_hash = hashlib.md5(url.encode()).hexdigest()[:10]
+        for f in available_formats:
+            format_id = f['format_id']
+            format_hash = hashlib.md5(format_id.encode()).hexdigest()[:10]
+            url_format_map[f"{url_hash}:{format_hash}"] = (url, format_id)
 
-    try:
-        # Attempt to download the video using yt-dlp
-        ydl_opts = {
-            'format': 'best',
-            'outtmpl': '%(title)s.%(ext)s',
-            'quiet': False,
-            'noplaylist': True
-        }
+        await present_upload_format_options(update, available_formats, url_hash)
+    else:
+        await update.message.reply_text("⚠️ No available formats for this video.")
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=True)
-            title = info_dict.get('title', 'No Title')
-            video_file_path = f"{title}.mp4"
-
-        # Upload the video to the chat
-        await context.bot.send_video(chat_id=user_id, video=open(video_file_path, 'rb'), caption=f'🎥 Title: {title}')
-
-        # Add to download records
-        if user_id not in download_records:
-            download_records[user_id] = []
-        download_records[user_id].append(f"Uploaded: {title}")
-
-    except Exception as e:
-        await update.message.reply_text(f'⚠️ Error: {str(e)}')
-        logging.error(f"Upload error: {str(e)}")  # Log the error for debugging
-    finally:
-        try:
-            os.remove(video_file_path)
-        except:
-            pass
-
-async def present_format_options(update: Update, formats, url_hash):
+async def present_upload_format_options(update: Update, formats, url_hash):
     keyboard = []
     for f in formats:
         format_id = f['format_id']
@@ -153,39 +132,42 @@ async def present_format_options(update: Update, formats, url_hash):
 
         format_hash = hashlib.md5(format_id.encode()).hexdigest()[:10]
         
-        callback_data = f"download:{url_hash}:{format_hash}"
+        callback_data = f"upload:{url_hash}:{format_hash}"
         button_text = f"{format_id} - {format_note} - {size}" if size != 'Unknown size' else f"{format_id} - {format_note}"
         button = InlineKeyboardButton(text=button_text, callback_data=callback_data)
         keyboard.append([button])
 
-    keyboard.append([InlineKeyboardButton("❌ CLOSE", callback_data="close")])  # Add a close option
+    keyboard.append([InlineKeyboardButton("❌ CLOSE", callback_data="close_upload")])  # Add a close option
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("🔍 Select the preferred format or file size to upload:", reply_markup=reply_markup)
+    await update.message.reply_text("🔍 Select the preferred format or quality to upload:", reply_markup=reply_markup)
 
-async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_upload_format_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     query.answer()  # Acknowledge the button press
     data = query.data.split(':')
 
-    if data[0] == "download":
+    if data[0] == "upload":
         url_hash = data[1]
         format_hash = data[2]
         original_url, selected_format = url_format_map.get(f"{url_hash}:{format_hash}", (None, None))
-        
+
         if original_url and selected_format:
             await query.message.reply_text(f"📥 Downloading video in {selected_format} quality...")  # Notify user
             await execute_video_download(update, original_url, selected_format)
+            await query.message.delete()  # Remove the format selection message
         else:
             await query.message.reply_text("⚠️ Error retrieving video details.")
-    elif data[0] == "close":
+            await query.message.delete()  # Remove the format selection message
+    elif data[0] == "close_upload":
         await query.message.reply_text("❌ Selection closed.")
+        await query.message.delete()  # Remove the format selection message
 
 async def execute_video_download(update: Update, url: str, format_id: str):
     user_id = update.effective_chat.id
     ydl_opts = {
         'format': format_id,
         'outtmpl': '%(title)s.%(ext)s',
-        'quiet': False,  # Change to False for more output
+        'quiet': False,
         'noplaylist': True,
         'progress_hooks': [lambda d: asyncio.run(track_progress(d, update))],
     }
@@ -284,9 +266,9 @@ def main():
     application.add_handler(CommandHandler('settings', settings))
     application.add_handler(CommandHandler('history', history_command))
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(CallbackQueryHandler(handle_format_selection, pattern=r'download:\S+:\S+'))
+    application.add_handler(CallbackQueryHandler(handle_upload_format_selection, pattern=r'upload:\S+:\S+'))
 
     application.run_polling()
 
 if __name__ == '__main__':
-    main()
+    main() 
