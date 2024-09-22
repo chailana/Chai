@@ -11,22 +11,22 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Callb
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s', level=logging.INFO)
 
-# Initialize user settings and history
+# Initialize user settings and download history
 user_preferences = {}
 download_records = {}
-url_format_map = {}  # To store original URL and format ID mapping
+url_format_map = {}  # Store original URL and format ID mapping
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('Hello! Use /download <URL> to fetch videos. Available formats will be displayed for selection.')
+    await update.message.reply_text('Welcome! Use /download <URL> to fetch videos. You will see available formats for selection.')
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
-        "Commands available:\n"
-        "/start - Initiate the bot\n"
+        "Available Commands:\n"
+        "/start - Start the bot\n"
         "/download <URL> - Download a video\n"
-        "/settings - Check or modify your settings\n"
-        "/help - Display this help information\n"
-        "/history - View your download history"
+        "/settings - View or modify your settings\n"
+        "/help - Show this help message\n"
+        "/history - Check your download history"
     )
     await update.message.reply_text(help_text)
 
@@ -34,7 +34,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
     history = download_records.get(user_id, [])
     if not history:
-        await update.message.reply_text("No download history found.")
+        await update.message.reply_text("No download history available.")
     else:
         history_output = "Download History:\n" + "\n".join(history)
         await update.message.reply_text(history_output)
@@ -72,12 +72,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'toggle_thumbnail':
         user_preferences[user_id]['upload_thumbnail'] = not user_preferences[user_id]['upload_thumbnail']
 
-    # Don't call settings here, let it be called only from /settings command
-    await query.message.reply_text("Settings updated.")
+    # No message sent here, only settings command will show updates
 
 async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 1:
-        await update.message.reply_text('Please provide a URL to download the video.')
+        await update.message.reply_text('Please provide a URL for the video download.')
         return
 
     url = context.args[0]
@@ -93,7 +92,7 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await present_format_options(update, available_formats, url_hash)
     else:
-        await update.message.reply_text("No formats available for this video.")
+        await update.message.reply_text("No available formats for this video.")
 
 async def present_format_options(update: Update, formats, url_hash):
     keyboard = []
@@ -111,7 +110,7 @@ async def present_format_options(update: Update, formats, url_hash):
 
     keyboard.append([InlineKeyboardButton("CLOSE", callback_data="close")])  # Add a close option
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Please select the desired format or file size to upload:", reply_markup=reply_markup)
+    await update.message.reply_text("Select the preferred format or file size to upload:", reply_markup=reply_markup)
 
 async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -128,7 +127,7 @@ async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_
         else:
             await query.message.reply_text("Error retrieving video details.")
     elif data[0] == "close":
-        await query.message.reply_text("Selection has been closed.")
+        await query.message.reply_text("Selection closed.")
 
 async def execute_video_download(update: Update, url: str, format_id: str):
     user_id = update.effective_chat.id
@@ -140,7 +139,7 @@ async def execute_video_download(update: Update, url: str, format_id: str):
         'progress_hooks': [lambda d: asyncio.run(track_progress(d, update))],
     }
 
-    await update.message.reply_text("📤 Uᴘʟᴏᴀᴅɪɴɢ Pʟᴇᴀsᴇ Wᴀɪᴛ...")
+    await update.message.reply_text("📤 Downloading... Please wait.")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -178,7 +177,7 @@ async def track_progress(progress, update):
             ''.join(["░" for _ in range(bar_length - math.floor(percentage / (100 / bar_length)))])
         )
 
-        status_message = f"**Uploading...**\n\n{progress_bar}\n" \
+        status_message = f"**Downloading...**\n\n{progress_bar}\n" \
                          f"**Progress:** {round(percentage, 2)}%\n" \
                          f"**Downloaded:** {format_bytes(downloaded_size)}\n" \
                          f"**Total Size:** {format_bytes(total_size)}\n" \
