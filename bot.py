@@ -123,6 +123,24 @@ async def upload_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("⚠️ No available formats for this video.")
 
+async def present_format_options(update: Update, formats, url_hash):
+    keyboard = []
+    for f in formats:
+        format_id = f['format_id']
+        format_note = f.get('format_note', f'Quality: {f.get("width", "Unknown")}x{f.get("height", "Unknown")}')
+        size = f.get('filesize', 'Unknown size')
+
+        format_hash = hashlib.md5(format_id.encode()).hexdigest()[:10]
+        
+        callback_data = f"download:{url_hash}:{format_hash}"
+        button_text = f"{format_id} - {format_note} - {size}" if size != 'Unknown size' else f"{format_id} - {format_note}"
+        button = InlineKeyboardButton(text=button_text, callback_data=callback_data)
+        keyboard.append([button])
+
+    keyboard.append([InlineKeyboardButton("❌ CLOSE", callback_data="close_download")])  # Add a close option
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("🔍 Select the preferred format or file size to upload:", reply_markup=reply_markup)
+
 async def present_upload_format_options(update: Update, formats, url_hash):
     keyboard = []
     for f in formats:
@@ -140,6 +158,27 @@ async def present_upload_format_options(update: Update, formats, url_hash):
     keyboard.append([InlineKeyboardButton("❌ CLOSE", callback_data="close_upload")])  # Add a close option
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("🔍 Select the preferred format or quality to upload:", reply_markup=reply_markup)
+
+async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    query.answer()  # Acknowledge the button press
+    data = query.data.split(':')
+
+    if data[0] == "download":
+        url_hash = data[1]
+        format_hash = data[2]
+        original_url, selected_format = url_format_map.get(f"{url_hash}:{format_hash}", (None, None))
+
+        if original_url and selected_format:
+            await query.message.reply_text(f"📥 Downloading video in {selected_format} quality...")  # Notify user
+            await execute_video_download(update, original_url, selected_format)
+            await query.message.delete()  # Remove the format selection message
+        else:
+            await query.message.reply_text("⚠️ Error retrieving video details.")
+            await query.message.delete()  # Remove the format selection message
+    elif data[0] == "close_download":
+        await query.message.reply_text("❌ Selection closed.")
+        await query.message.delete()  # Remove the format selection message
 
 async def handle_upload_format_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -266,9 +305,10 @@ def main():
     application.add_handler(CommandHandler('settings', settings))
     application.add_handler(CommandHandler('history', history_command))
     application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(CallbackQueryHandler(handle_format_selection, pattern=r'download:\S+:\S+'))
     application.add_handler(CallbackQueryHandler(handle_upload_format_selection, pattern=r'upload:\S+:\S+'))
 
     application.run_polling()
 
 if __name__ == '__main__':
-    main() 
+    main()
