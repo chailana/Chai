@@ -1,9 +1,14 @@
 import os
+from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import yt_dlp
 
-TOKEN = 'YOUR_BOT_TOKEN'
+# Load environment variables
+load_dotenv()
+
+# Get bot token from environment variable
+TOKEN = os.getenv('BOT_TOKEN')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Welcome! Send me a video URL to download.')
