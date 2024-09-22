@@ -5,8 +5,13 @@ import asyncio
 import math
 import time
 import hashlib
+from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
+
+# Load environment variables from .env file
+load_dotenv()
+TOKEN = os.getenv('BOT_TOKEN')
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s', level=logging.INFO)
@@ -71,8 +76,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_preferences[user_id]['upload_as_video'] = not user_preferences[user_id]['upload_as_video']
     elif query.data == 'toggle_thumbnail':
         user_preferences[user_id]['upload_thumbnail'] = not user_preferences[user_id]['upload_thumbnail']
-
-    # No message sent here, only settings command will show updates
 
 async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 1:
@@ -223,7 +226,7 @@ def fetch_available_formats(url):
         return info.get('formats', [])
 
 def main():
-    application = ApplicationBuilder().token('6985164126:AAF2wxioikBvrlzzBlSklXqNpO8jG-eyaVY').build()
+    application = ApplicationBuilder().token(TOKEN).build()
 
     application.add_handler(CommandHandler('start', start_command))
     application.add_handler(CommandHandler('help', help_command))
