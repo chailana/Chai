@@ -4,3 +4,4 @@ python-telegram-bot
 yt-dlp
 httpx
 python-dotenv
+requests
