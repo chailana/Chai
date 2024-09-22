@@ -20,8 +20,8 @@ def handle_message(message):
         try:
             file_path = download_video(url)
             if file_path:
-                with open(file_path, 'rb') as video:
-                    bot.send_video(message.chat.id, video)
+                # Send the video in chunks if it's larger than 50MB
+                send_large_file(message.chat.id, file_path)
                 os.remove(file_path)  # Clean up the file after sending
             else:
                 bot.reply_to(message, "Failed to download a valid video file.")
@@ -39,11 +39,6 @@ def download_video(url):
         'outtmpl': '%(title)s.%(ext)s',
         'noplaylist': True,
         'progress_hooks': [hook],
-        'postprocessors': [{
-            'key': 'FFmpegVideoConvertor',
-            'preferedformat': 'mp4',  # Convert to mp4 if necessary
-        }],
-        'limit_rate': '1M',  # Limit download rate to reduce memory usage
     }
     
     try:
@@ -54,6 +49,21 @@ def download_video(url):
     except Exception as e:
         print(f"Error downloading file: {e}")
         return None
+
+def send_large_file(chat_id, file_path):
+    # Check the size of the file and send in chunks if necessary
+    max_file_size = 50 * 1024 * 1024  # 50MB
+    if os.path.getsize(file_path) > max_file_size:
+        with open(file_path, 'rb') as video:
+            # Send the video in chunks (Telegram allows files up to 2GB)
+            while True:
+                chunk = video.read(max_file_size)
+                if not chunk:
+                    break
+                bot.send_video(chat_id, chunk)
+    else:
+        with open(file_path, 'rb') as video:
+            bot.send_video(chat_id, video)
 
 def hook(d):
     if d['status'] == 'finished':
