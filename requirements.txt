@@ -1,7 +1,5 @@
 flask
 gunicorn
-python-telegram-bot
-yt-dlp
-httpx
-python-dotenv
-requests
+python-telegram-bot==20.3
+yt-dlp==2023.7.6
+python-dotenv==1.0.0
