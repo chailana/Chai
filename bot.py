@@ -131,6 +131,7 @@ async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_
         original_url, selected_format = url_format_map.get(f"{url_hash}:{format_hash}", (None, None))
         
         if original_url and selected_format:
+            await query.message.reply_text(f"📥 Downloading video in {selected_format} quality...")  # Notify user
             await execute_video_download(update, original_url, selected_format)
         else:
             await query.message.reply_text("⚠️ Error retrieving video details.")
