@@ -40,12 +40,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(history_output)
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query  # Get the callback query
-    if not query:  # Check if query is None
-        return
-
-    await query.answer()  # Acknowledge the button press
-    user_id = query.message.chat.id  # Use the chat ID from the query message
+    user_id = update.effective_chat.id
 
     if user_id not in user_preferences:
         user_preferences[user_id] = {'upload_as_video': True, 'upload_thumbnail': True}
@@ -62,7 +57,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await query.message.edit_text(settings_info, reply_markup=reply_markup)  # Update the same message instead of sending a new one
+    await update.message.reply_text(settings_info, reply_markup=reply_markup)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -77,7 +72,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'toggle_thumbnail':
         user_preferences[user_id]['upload_thumbnail'] = not user_preferences[user_id]['upload_thumbnail']
 
-    await settings(update, context)  # Call settings to update the user
+    # Don't call settings here, let it be called only from /settings command
+    await query.message.reply_text("Settings updated.")
 
 async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 1:
