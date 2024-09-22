@@ -140,17 +140,14 @@ async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_
 
 async def execute_video_download(update: Update, url: str, format_id: str):
     user_id = update.effective_chat.id
-    global start_time
-    start_time = time.time()  # Start the timer for progress tracking
-
     ydl_opts = {
         'format': format_id,
         'outtmpl': '%(title)s.%(ext)s',
-        'quiet': True,
+        'quiet': False,  # Change to False for more output
         'noplaylist': True,
         'progress_hooks': [lambda d: asyncio.run(track_progress(d, update))],
     }
-
+    
     await update.message.reply_text("📤 Downloading... Please wait.")
 
     try:
@@ -159,19 +156,16 @@ async def execute_video_download(update: Update, url: str, format_id: str):
             title = info_dict.get('title', 'No Title')
 
         video_file_path = f"{title}.mp4"
-
-        # Send video to the user
         await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_file_path, 'rb'), caption=f'🎥 Title: {title}')
 
-        # Update download history
         if user_id not in download_records:
             download_records[user_id] = []
         download_records[user_id].append(f"{title}")
 
     except Exception as e:
         await update.message.reply_text(f'⚠️ Error: {str(e)}')
+        logging.error(f"Download error: {str(e)}")  # Log the error for debugging
     finally:
-        # Safely remove the video file after sending
         try:
             os.remove(video_file_path)
         except:
@@ -206,33 +200,39 @@ async def track_progress(progress, update):
             print(f"⚠️ Error updating progress: {e}")
 
 def format_bytes(size):
-    if size == 0:
-        return "0B"
-    size_name = ("B", "KB", "MB", "GB", "TB")
-    i = int(math.floor(math.log(size, 1024)))
-    p = math.pow(1024, i)
-    s = round(size / p, 2)
-    return f"{s} {size_name[i]}"
+    if not size:
+        return ""
+    factor = 1024
+    index = 0
+    units = {0: ' ', 1: 'K', 2: 'M', 3: 'G', 4: 'T'}
+    while size > factor:
+        size /= factor
+        index += 1
+    return str(round(size, 2)) + " " + units[index] + 'B'
 
-def format_time(milliseconds):
-    seconds = int(milliseconds / 1000)
-    minutes = seconds // 60
-    seconds = seconds % 60
-    return f"{minutes}m {seconds}s"
+def format_time(milliseconds: int) -> str:
+    seconds, milliseconds = divmod(int(milliseconds), 1000)
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+    time_str = ((str(days) + "d, ") if days else "") + \
+                ((str(hours) + "h, ") if hours else "") + \
+                ((str(minutes) + "m, ") if minutes else "") + \
+                ((str(seconds) + "s, ") if seconds else "")
+    return time_str[:-2]
 
 def fetch_available_formats(url):
-    ydl_opts = {'quiet': True, 'noplaylist': True}
-    
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        try:
-            info_dict = ydl.extract_info(url, download=False)
-            formats = info_dict.get('formats', [])
-            return [{'format_id': f['format_id'], 'width': f.get('width'), 'height': f.get('height'), 'filesize': f.get('filesize')} for f in formats]
-        except Exception as e:
-            print(f"Error fetching formats: {e}")
-            return None
+    ydl_opts = {
+        'format': 'best',
+        'quiet': True,
+        'noplaylist': True
+    }
 
-if __name__ == '__main__':
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        return info.get('formats', [])
+
+def main():
     application = ApplicationBuilder().token(TOKEN).build()
 
     application.add_handler(CommandHandler('start', start_command))
@@ -241,7 +241,9 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler('settings', settings))
     application.add_handler(CommandHandler('history', history_command))
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(CallbackQueryHandler(handle_format_selection, pattern="^download"))
+    application.add_handler(CallbackQueryHandler(handle_format_selection, pattern=r'download:\S+:\S+'))
 
-    print("🚀 Bot is running...")
     application.run_polling()
+
+if __name__ == '__main__':
+    main()
