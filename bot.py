@@ -46,7 +46,7 @@ class Database:
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(url)
-                return info_dict['formats']
+                return info_dict['formats']  # Return available formats without downloading
         except Exception as e:
             print(f"Error retrieving video formats: {e}")
             return None
@@ -64,6 +64,17 @@ async def send_welcome(client, message):
     
     await client.send_message(message.chat.id, "Welcome! Send me a direct video link or a URL from supported websites (like YouTube) to download.\nUse /help for more commands.")
 
+@bot.on_message(filters.command("help"))
+async def send_help(client, message):
+    help_text = (
+        "/start - Welcome message\n"
+        "/help - List of commands\n"
+        "/setformat <format> - Set your preferred download format (e.g., mp4)\n"
+        "/resetformat - Reset your preferred format to default\n"
+        "Just send a video URL to download it."
+    )
+    await client.send_message(message.chat.id, help_text)
+
 @bot.on_message(filters.text)
 async def handle_message(client, message):
     url = message.text.strip()
@@ -74,10 +85,16 @@ async def handle_message(client, message):
         
         if formats:
             keyboard = []
+            seen_formats = set()  # To avoid duplicates
+            
             for fmt in formats:
-                if 'height' in fmt:
-                    button = InlineKeyboardButton(f"{fmt.get('format_note', 'No Note')} ({fmt['height']}p)", callback_data=f"quality_{fmt['format_id']}")
+                if 'height' in fmt and fmt['format_id'] not in seen_formats:
+                    button = InlineKeyboardButton(
+                        f"{fmt.get('format_note', 'No Note')} ({fmt['height']}p)", 
+                        callback_data=f"quality_{fmt['format_id']}"
+                    )
                     keyboard.append([button])
+                    seen_formats.add(fmt['format_id'])  # Mark this format as seen
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await client.send_message(message.chat.id, "Available quality options:", reply_markup=reply_markup)
@@ -105,25 +122,25 @@ async def download_video(user_id, url, format_id):
      }
     
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url , download=True)
-            final_video_file= ydl.prepare_filename(info_dict)
+         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+             info_dict = ydl.extract_info(url , download=True)
+             final_video_file= ydl.prepare_filename(info_dict)
 
-            await bot.send_video(DUMP_CHANNEL_ID , video=final_video_file)  # Send to dump channel
-            await bot.send_video(user_id , video=final_video_file)  # Send to user
+             await bot.send_video(DUMP_CHANNEL_ID , video=final_video_file)  # Send to dump channel
+             await bot.send_video(user_id , video=final_video_file)  # Send to user
             
-            os.remove(final_video_file)  # Clean up the video file after sending
+             os.remove(final_video_file)  # Clean up the video file after sending
             
-    except Exception as e:
-        print(f"Error downloading file: {e}")
+     except Exception as e:
+         print(f"Error downloading file: {e}")
 
 def is_valid_url(url):
     return url.startswith("http://") or url.startswith("https://")
 
 def progress_hook(d,user_id):
-    if d['status'] == 'downloading':
-        percent= d['downloaded_bytes'] / d['total_bytes'] * 100 
-        bot.send_message(user_id , f"Download progress: {percent:.2f}%")
+     if d['status'] == 'downloading':
+         percent= d['downloaded_bytes'] / d['total_bytes'] * 100 
+         bot.send_message(user_id , f"Download progress: {percent:.2f}%")
 
 if __name__ == '__main__':
-    bot.run()
+     bot.run()
