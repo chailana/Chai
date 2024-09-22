@@ -9,6 +9,8 @@ load_dotenv()
 
 # Get bot token from environment variable
 TOKEN = os.getenv('BOT_TOKEN')
+if not TOKEN:
+    raise ValueError("No BOT_TOKEN found in environment variables.")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Welcome! Send me a video URL to download.')
@@ -41,6 +43,8 @@ async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         os.remove(filename)
         await update.message.reply_text('Upload complete!')
 
+    except yt_dlp.utils.DownloadError:
+        await update.message.reply_text('Failed to download the video. Please check the URL and try again.')
     except Exception as e:
         await update.message.reply_text(f'An error occurred: {str(e)}')
 
