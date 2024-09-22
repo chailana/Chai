@@ -29,6 +29,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🛠️ Available Commands:\n"
         "/start - Start the bot\n"
         "/download <URL> - Download a video\n"
+        "/upload <URL> - Upload a video from supported sites\n"
         "/settings - View or modify your settings\n"
         "/help - Show this help message\n"
         "/history - Check your download history"
@@ -62,7 +63,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    if hasattr(update, 'callback_query'):
+    if update.callback_query:
         await update.callback_query.message.reply_text(settings_info, reply_markup=reply_markup)
     else:
         await update.message.reply_text(settings_info, reply_markup=reply_markup)
@@ -77,10 +78,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == 'toggle_video':
         user_preferences[user_id]['upload_as_video'] = not user_preferences[user_id]['upload_as_video']
-        await settings(query, context)  # Pass the query object here
+        await settings(query, context)
     elif query.data == 'toggle_thumbnail':
         user_preferences[user_id]['upload_thumbnail'] = not user_preferences[user_id]['upload_thumbnail']
-        await settings(query, context)  # Pass the query object here
+        await settings(query, context)
 
 async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 1:
@@ -101,6 +102,47 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await present_format_options(update, available_formats, url_hash)
     else:
         await update.message.reply_text("⚠️ No available formats for this video.")
+
+async def upload_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 1:
+        await update.message.reply_text('⚠️ Please provide a URL to upload the video from.')
+        return
+
+    url = context.args[0]
+    user_id = update.effective_chat.id
+
+    await update.message.reply_text("📤 Downloading and uploading your video... Please wait.")
+
+    try:
+        # Attempt to download the video using yt-dlp
+        ydl_opts = {
+            'format': 'best',
+            'outtmpl': '%(title)s.%(ext)s',
+            'quiet': False,
+            'noplaylist': True
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=True)
+            title = info_dict.get('title', 'No Title')
+            video_file_path = f"{title}.mp4"
+
+        # Upload the video to the chat
+        await context.bot.send_video(chat_id=user_id, video=open(video_file_path, 'rb'), caption=f'🎥 Title: {title}')
+
+        # Add to download records
+        if user_id not in download_records:
+            download_records[user_id] = []
+        download_records[user_id].append(f"Uploaded: {title}")
+
+    except Exception as e:
+        await update.message.reply_text(f'⚠️ Error: {str(e)}')
+        logging.error(f"Upload error: {str(e)}")  # Log the error for debugging
+    finally:
+        try:
+            os.remove(video_file_path)
+        except:
+            pass
 
 async def present_format_options(update: Update, formats, url_hash):
     keyboard = []
@@ -238,6 +280,7 @@ def main():
     application.add_handler(CommandHandler('start', start_command))
     application.add_handler(CommandHandler('help', help_command))
     application.add_handler(CommandHandler('download', download_and_send))
+    application.add_handler(CommandHandler('upload', upload_video))  # New upload command
     application.add_handler(CommandHandler('settings', settings))
     application.add_handler(CommandHandler('history', history_command))
     application.add_handler(CallbackQueryHandler(button_handler))
