@@ -29,6 +29,7 @@ def send_help(client, message):
         "/start - Welcome message\n"
         "/help - List of commands\n"
         "/setformat <format> - Set your preferred download format (e.g., mp4)\n"
+        "/resetformat - Reset your preferred format to default\n"
         "Just send a video URL to download it."
     )
     client.send_message(message.chat.id, help_text)
@@ -42,6 +43,14 @@ def set_format(client, message):
     else:
         client.send_message(message.chat.id, "Please specify a valid format after the command.")
 
+@bot.on_message(filters.command("resetformat"))
+def reset_format(client, message):
+    if message.chat.id in user_preferences:
+        del user_preferences[message.chat.id]
+        client.send_message(message.chat.id, "Your preferred format has been reset to default.")
+    else:
+        client.send_message(message.chat.id, "You have not set a preferred format yet.")
+
 @bot.on_message(filters.text)
 def handle_message(client, message):
     url = message.text.strip()
@@ -54,7 +63,9 @@ def handle_message(client, message):
         formats = get_video_formats(url)
         
         if formats:
-            quality_options = "\n".join([f"{fmt['format_note']} ({fmt['height']}p)" for fmt in formats if 'height' in fmt])
+            quality_options = "\n".join(
+                [f"{fmt.get('format_note', 'No Note')} ({fmt.get('height', 'N/A')}p)" for fmt in formats if 'height' in fmt]
+            )
             quality_requests[message.chat.id] = formats  # Store available formats for the user
             
             client.send_message(message.chat.id, f"Available quality options:\n{quality_options}\n\nPlease reply with the desired quality (e.g., 720p).")
@@ -73,7 +84,7 @@ def handle_quality_selection(client, message):
         formats = quality_requests[user_id]
         
         # Find the selected format
-        selected_format = next((fmt for fmt in formats if selected_quality in fmt['format_note']), None)
+        selected_format = next((fmt for fmt in formats if selected_quality in fmt.get('format_note', '')), None)
         
         if selected_format:
             client.send_message(user_id, f"You selected: {selected_quality}. Downloading...")
@@ -106,6 +117,7 @@ def download_video(user_id, url, format_id):
     ydl_opts = {
         'format': format_id,
         'outtmpl': '%(title)s.%(ext)s',
+        'progress_hooks': [lambda d: progress_hook(d, user_id)],
     }
     
     try:
@@ -121,6 +133,11 @@ def download_video(user_id, url, format_id):
             
     except Exception as e:
         print(f"Error downloading file: {e}")
+
+def progress_hook(d, user_id):
+    if d['status'] == 'downloading':
+        percent = d['downloaded_bytes'] / d['total_bytes'] * 100
+        bot.send_message(user_id, f"Download progress: {percent:.2f}%")
 
 if __name__ == '__main__':
     bot.run()
