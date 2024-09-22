@@ -31,7 +31,6 @@ def handle_message(message):
         bot.reply_to(message, "Please send a valid URL.")
 
 def is_valid_url(url):
-    # Simple URL validation (you can expand this)
     return url.startswith("http://") or url.startswith("https://")
 
 def download_video(url):
@@ -40,6 +39,11 @@ def download_video(url):
         'outtmpl': '%(title)s.%(ext)s',
         'noplaylist': True,
         'progress_hooks': [hook],
+        'postprocessors': [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',  # Convert to mp4 if necessary
+        }],
+        'limit_rate': '1M',  # Limit download rate to reduce memory usage
     }
     
     try:
