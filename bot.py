@@ -46,7 +46,7 @@ class Database:
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(url)
-                return info_dict['formats']  # Return available formats without downloading
+                return info_dict['formats']
         except Exception as e:
             print(f"Error retrieving video formats: {e}")
             return None
@@ -104,26 +104,26 @@ async def download_video(user_id, url, format_id):
          'progress_hooks': [lambda d: progress_hook(d,user_id)],
      }
     
-     try:
-         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-             info_dict = ydl.extract_info(url , download=True)
-             final_video_file= ydl.prepare_filename(info_dict)
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url , download=True)
+            final_video_file= ydl.prepare_filename(info_dict)
 
-             await bot.send_video(DUMP_CHANNEL_ID , video=final_video_file)  # Send to dump channel
-             await bot.send_video(user_id , video=final_video_file)  # Send to user
+            await bot.send_video(DUMP_CHANNEL_ID , video=final_video_file)  # Send to dump channel
+            await bot.send_video(user_id , video=final_video_file)  # Send to user
             
-             os.remove(final_video_file)  # Clean up the video file after sending
+            os.remove(final_video_file)  # Clean up the video file after sending
             
     except Exception as e:
-         print(f"Error downloading file: {e}")
+        print(f"Error downloading file: {e}")
 
 def is_valid_url(url):
     return url.startswith("http://") or url.startswith("https://")
 
 def progress_hook(d,user_id):
-     if d['status'] == 'downloading':
-         percent= d['downloaded_bytes'] / d['total_bytes'] * 100 
-         bot.send_message(user_id , f"Download progress: {percent:.2f}%")
+    if d['status'] == 'downloading':
+        percent= d['downloaded_bytes'] / d['total_bytes'] * 100 
+        bot.send_message(user_id , f"Download progress: {percent:.2f}%")
 
 if __name__ == '__main__':
-     bot.run()
+    bot.run()
