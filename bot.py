@@ -1,63 +1,50 @@
 import os
-import requests
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
-from urllib.parse import urlparse
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import yt_dlp
 
-# Load environment variables from .env file
-from dotenv import load_dotenv
-load_dotenv()
+TOKEN = 'YOUR_BOT_TOKEN'
 
-# Telegram bot token
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text('Welcome! Send me a video URL to download.')
 
-def start(update: Update, context: CallbackContext) -> None:
-    """Send a message when the command /start is issued."""
-    update.message.reply_text('Hi! Send me a URL to upload.')
-
-def download_file(url: str, file_name: str):
-    """Downloads a file from a given URL."""
-    with open(file_name, 'wb') as f:
-        response = requests.get(url, stream=True)
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
-
-def process_url(update: Update, context: CallbackContext) -> None:
-    """Processes the URL sent by the user."""
+async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text
-    parsed_url = urlparse(url)
+    chat_id = update.effective_chat.id
 
-    if not all([parsed_url.scheme, parsed_url.netloc]):
-        update.message.reply_text("Invalid URL format. Please provide a valid URL.")
-        return
+    await update.message.reply_text('Starting download...')
+
+    ydl_opts = {
+        'format': 'bestvideo+bestaudio/best',
+        'outtmpl': '%(title)s.%(ext)s',
+    }
 
     try:
-        response = requests.head(url, allow_redirects=True)
-        response.raise_for_status()
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
 
-        file_name = os.path.basename(parsed_url.path) or 'uploaded_file'
+        await update.message.reply_text('Download complete. Uploading to Telegram...')
+        
+        with open(filename, 'rb') as video_file:
+            message = await context.bot.send_document(chat_id=chat_id, document=video_file, filename=filename)
+            file_id = message.document.file_id
+            
+        await context.bot.send_video(chat_id=chat_id, video=file_id, supports_streaming=True)
+        
+        os.remove(filename)
+        await update.message.reply_text('Upload complete!')
 
-        update.message.reply_text("Downloading & Uploading file... Please be patient, this might take a while.")
-        download_file(url, file_name)
+    except Exception as e:
+        await update.message.reply_text(f'An error occurred: {str(e)}')
 
-        # Send the downloaded file
-        with open(file_name, 'rb') as f:
-            context.bot.send_document(chat_id=update.effective_chat.id, document=f)
-
-        os.remove(file_name) 
-
-    except requests.exceptions.RequestException as e:
-        update.message.reply_text(f"Error downloading or uploading file: {e}")
-
-async def main() -> None:
-    """Start the bot."""
-    application = Application.builder().token(BOT_TOKEN).build()
+def main():
+    application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_url))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_video))
 
-    await application.run_polling()
+    application.run_polling()
 
 if __name__ == '__main__':
-    import asyncio
-    asyncio.run(main())
+    main()
