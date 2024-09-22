@@ -39,17 +39,21 @@ def download_video(url):
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': '%(title)s.%(ext)s',
         'noplaylist': True,
+        'progress_hooks': [hook],
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(url, download=True)
-            video_title = info_dict.get('title', None)
             video_file = ydl.prepare_filename(info_dict)
             return video_file
     except Exception as e:
         print(f"Error downloading file: {e}")
         return None
+
+def hook(d):
+    if d['status'] == 'finished':
+        print(f"\nDone downloading video: {d['filename']}")
 
 if __name__ == '__main__':
     bot.polling()
