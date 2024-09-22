@@ -1,8 +1,7 @@
-# bot.py
 import os
 import requests
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, filters, CallbackContext
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 from urllib.parse import urlparse
 
 # Load environment variables from .env file
@@ -50,16 +49,16 @@ def process_url(update: Update, context: CallbackContext) -> None:
     except requests.exceptions.RequestException as e:
         update.message.reply_text(f"Error downloading or uploading file: {e}")
 
-def main() -> None:
+async def main() -> None:
     """Start the bot."""
-    updater = Updater(BOT_TOKEN)
-    dispatcher = updater.dispatcher
+    application = Application.builder().token(BOT_TOKEN).build()
 
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_url))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_url))
 
-    updater.start_polling()
-    updater.idle()
+    await application.start_polling()
+    await application.idle()
 
 if __name__ == '__main__':
-    main()
+    import asyncio
+    asyncio.run(main())
