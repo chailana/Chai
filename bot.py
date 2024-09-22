@@ -1,3 +1,6 @@
+#Here is the complete updated code for your Telegram bot, incorporating the necessary adjustments to handle callback queries correctly and using the provided bot token:
+
+#```python
 import logging
 import os
 import yt_dlp
@@ -8,13 +11,13 @@ import hashlib
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
-# Set up logging configuration
+# Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s', level=logging.INFO)
 
-# Initialize user preferences and download records
+# Initialize user settings and history
 user_preferences = {}
 download_records = {}
-url_format_map = {}  # To keep track of original URL and format ID associations
+url_format_map = {}  # To store original URL and format ID mapping
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Hello! Use /download <URL> to fetch videos. Available formats will be displayed for selection.')
@@ -40,7 +43,9 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(history_output)
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_chat.id
+    query = update.callback_query  # Get the callback query
+    user_id = query.message.chat.id  # Use the chat ID from the query message
+
     if user_id not in user_preferences:
         user_preferences[user_id] = {'upload_as_video': True, 'upload_thumbnail': True}
     
@@ -56,10 +61,11 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(settings_info, reply_markup=reply_markup)
+    await query.message.reply_text(settings_info, reply_markup=reply_markup)  # Use query.message
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    await query.answer()  # Acknowledge the button press
     user_id = query.message.chat.id
 
     if user_id not in user_preferences:
@@ -70,7 +76,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'toggle_thumbnail':
         user_preferences[user_id]['upload_thumbnail'] = not user_preferences[user_id]['upload_thumbnail']
 
-    await settings(update, context)
+    await settings(update, context)  # Call settings to update the user
 
 async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 1:
@@ -82,7 +88,6 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     available_formats = fetch_available_formats(url)
     if available_formats:
-        # Keep mapping for later retrieval
         url_hash = hashlib.md5(url.encode()).hexdigest()[:10]
         for f in available_formats:
             format_id = f['format_id']
@@ -98,12 +103,11 @@ async def present_format_options(update: Update, formats, url_hash):
     for f in formats:
         format_id = f['format_id']
         format_note = f.get('format_note', f'Quality: {f.get("width", "Unknown")}x{f.get("height", "Unknown")}')
-        size = f.get('filesize', 'Unknown size')  # Get the file size if available
+        size = f.get('filesize', 'Unknown size')
 
-        # Generate hash for the format_id
-        format_hash = hashlib.md5(format_id.encode()).hexdigest()[:10]  # Limit to first 10 characters
+        format_hash = hashlib.md5(format_id.encode()).hexdigest()[:10]
         
-        callback_data = f"download:{url_hash}:{format_hash}"  # Utilize hashes for callback data
+        callback_data = f"download:{url_hash}:{format_hash}"
         button_text = f"{format_id} - {format_note} - {size}" if size != 'Unknown size' else f"{format_id} - {format_note}"
         button = InlineKeyboardButton(text=button_text, callback_data=callback_data)
         keyboard.append([button])
@@ -149,7 +153,6 @@ async def execute_video_download(update: Update, url: str, format_id: str):
         video_file_path = f"{title}.mp4"
         await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_file_path, 'rb'), caption=f'Title: {title}')
 
-        # Update download history
         if user_id not in download_records:
             download_records[user_id] = []
         download_records[user_id].append(f"{title}")
@@ -157,7 +160,6 @@ async def execute_video_download(update: Update, url: str, format_id: str):
     except Exception as e:
         await update.message.reply_text(f'Error: {str(e)}')
     finally:
-        # Clean up downloaded files
         try:
             os.remove(video_file_path)
         except:
@@ -168,7 +170,7 @@ async def track_progress(progress, update):
         return
     
     if progress['status'] == 'downloading':
-        total_size = progress.get('total_bytes', 1)  # Prevent division by zero
+        total_size = progress.get('total_bytes', 1)  # Avoid division by zero
         downloaded_size = progress.get('downloaded_bytes', 0)
 
         percentage = downloaded_size * 100 / total_size
@@ -239,3 +241,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+# modifications or assistance, feel free to ask!
