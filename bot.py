@@ -8,12 +8,11 @@ import motor.motor_asyncio
 
 load_dotenv()
 
-API_ID = os.getenv('API_ID')  # Your API ID from https://my.telegram.org
-API_HASH = os.getenv('API_HASH')  # Your API Hash from https://my.telegram.org
-BOT_TOKEN = os.getenv('BOT_TOKEN')  # Your Bot Token from BotFather
+API_ID = os.getenv('API_ID')
+API_HASH = os.getenv('API_HASH')
+BOT_TOKEN = os.getenv('BOT_TOKEN')
 DUMP_CHANNEL_ID = -1002247666039  # Replace with your channel ID
 
-# Database Class for User Settings (as provided earlier)
 class Database:
     def __init__(self, uri, database_name):
         self._client = motor.motor_asyncio.AsyncIOMotorClient(uri)
@@ -40,22 +39,20 @@ class Database:
 
     async def get_video_formats(self, url):
         ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
             'noplaylist': True,
         }
         
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(url)
-                return info_dict['formats']  # Return available formats without downloading
+                return info_dict['formats']
         except Exception as e:
             print(f"Error retrieving video formats: {e}")
             return None
 
-# Initialize the database connection
 db = Database(os.getenv("DATABASE_URL"), "UploadLinkToFileBot")
 
-# Initialize the bot with API ID, API Hash, and Bot Token
 bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 @bot.on_message(filters.command("start"))
@@ -71,15 +68,14 @@ async def handle_message(client, message):
     if is_valid_url(url):
         await client.send_message(message.chat.id, f"Downloading from {url}...")
         
-        # Start downloading and get available formats
         formats = await db.get_video_formats(url)
         
         if formats:
             keyboard = []
             for fmt in formats:
                 if 'height' in fmt:
-                    quality_button = InlineKeyboardButton(f"{fmt.get('format_note', 'No Note')} ({fmt['height']}p)", callback_data=f"quality_{fmt['format_id']}")
-                    keyboard.append([quality_button])
+                    button = InlineKeyboardButton(f"{fmt.get('format_note', 'No Note')} ({fmt['height']}p)", callback_data=f"quality_{fmt['format_id']}")
+                    keyboard.append([button])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await client.send_message(message.chat.id, "Available quality options:", reply_markup=reply_markup)
@@ -93,13 +89,10 @@ async def handle_quality_selection(client, callback_query):
     user_id = callback_query.from_user.id
     selected_format_id = callback_query.data.split("_")[1]
 
-    # Store the selected format temporarily (or you could use a database)
     await callback_query.answer()  # Acknowledge the callback
 
-    # Retrieve the URL from the user's previous message (you may want to store this better)
     url = callback_query.message.reply_to_message.text.strip()
     
-    # Download and send the video based on selected format
     await download_video(user_id, url, selected_format_id)
 
 async def download_video(user_id, url, format_id):
@@ -114,7 +107,6 @@ async def download_video(user_id, url, format_id):
              info_dict = ydl.extract_info(url , download=True)
              final_video_file= ydl.prepare_filename(info_dict)
 
-             # Send the video file and also upload it to the dump channel
              await bot.send_video(DUMP_CHANNEL_ID , video=final_video_file)  # Send to dump channel
              await bot.send_video(user_id , video=final_video_file)  # Send to user
             
