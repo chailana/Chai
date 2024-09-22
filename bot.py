@@ -3,21 +3,21 @@ import time
 from dotenv import load_dotenv
 from pyrogram import Client, filters
 import yt_dlp
-from PIL import Image
-import io
 
 load_dotenv()
 
 API_ID = os.getenv('API_ID')  # Your API ID from https://my.telegram.org
 API_HASH = os.getenv('API_HASH')  # Your API Hash from https://my.telegram.org
 BOT_TOKEN = os.getenv('BOT_TOKEN')  # Your Bot Token from BotFather
+DUMP_CHANNEL_ID = -1002247666039  # Replace with your channel ID
 
 # Initialize the bot with API ID, API Hash, and Bot Token
 bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 # Global variables to store user preferences and download queue
 user_preferences = {}
-download_queue = []
+download_queue = {}
+quality_requests = {}  # To track quality selection requests
 
 @bot.on_message(filters.command("start"))
 def send_welcome(client, message):
@@ -33,67 +33,94 @@ def send_help(client, message):
     )
     client.send_message(message.chat.id, help_text)
 
+@bot.on_message(filters.command("setformat"))
+def set_format(client, message):
+    format_choice = message.text.split(maxsplit=1)
+    if len(format_choice) == 2:
+        user_preferences[message.chat.id] = format_choice[1]
+        client.send_message(message.chat.id, f"Your preferred format has been set to: {format_choice[1]}")
+    else:
+        client.send_message(message.chat.id, "Please specify a valid format after the command.")
+
 @bot.on_message(filters.text)
 def handle_message(client, message):
     url = message.text.strip()
     if is_valid_url(url):
         # Add to download queue and process
-        download_queue.append((client, message.chat.id, url))
-        process_download_queue()
+        download_queue[message.chat.id] = url  # Store the URL for the user
+        client.send_message(message.chat.id, f"Downloading from {url}...")
+        
+        # Start downloading and get available formats
+        formats = get_video_formats(url)
+        
+        if formats:
+            quality_options = "\n".join([f"{fmt['format_note']} ({fmt['height']}p)" for fmt in formats if 'height' in fmt])
+            quality_requests[message.chat.id] = formats  # Store available formats for the user
+            
+            client.send_message(message.chat.id, f"Available quality options:\n{quality_options}\n\nPlease reply with the desired quality (e.g., 720p).")
+        else:
+            client.send_message(message.chat.id, "Failed to retrieve video formats.")
     else:
         client.send_message(message.chat.id, "Please send a valid URL.")
+
+@bot.on_message(filters.text & filters.private)
+def handle_quality_selection(client, message):
+    user_id = message.chat.id
+    if user_id in quality_requests:
+        selected_quality = message.text.strip()
+        
+        # Get available formats for this user
+        formats = quality_requests[user_id]
+        
+        # Find the selected format
+        selected_format = next((fmt for fmt in formats if selected_quality in fmt['format_note']), None)
+        
+        if selected_format:
+            client.send_message(user_id, f"You selected: {selected_quality}. Downloading...")
+            download_video(user_id, download_queue[user_id], selected_format['format_id'])
+            del download_queue[user_id]  # Remove from queue after processing
+            del quality_requests[user_id]  # Clear the quality request after processing
+        else:
+            client.send_message(user_id, "Selected quality not available. Please choose from the available options.")
+    else:
+        client.send_message(user_id, "Please send a valid video URL first.")
 
 def is_valid_url(url):
     return url.startswith("http://") or url.startswith("https://")
 
-def download_video(url):
+def get_video_formats(url):
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-        'outtmpl': '%(title)s.%(ext)s',
         'noplaylist': True,
-        'postprocessors': [{
-            'key': 'FFmpegVideoThumbnail',
-            'output_template': '%(title)s_thumbnail.jpg',
-            'preferedformat': 'jpg',  # Generate thumbnail in jpg format
-        }],
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url)
+            return info_dict['formats']  # Return available formats without downloading
+    except Exception as e:
+        print(f"Error retrieving video formats: {e}")
+        return None
+
+def download_video(user_id, url, format_id):
+    ydl_opts = {
+        'format': format_id,
+        'outtmpl': '%(title)s.%(ext)s',
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(url, download=True)
-            video_file = ydl.prepare_filename(info_dict)
-            thumbnail_file = f"{info_dict['title']}_thumbnail.jpg"
-            return video_file, thumbnail_file  # Return both video and thumbnail paths
+            final_video_file = ydl.prepare_filename(info_dict)
+
+            # Send the video file and also upload it to the dump channel
+            bot.send_video(DUMP_CHANNEL_ID, video=final_video_file)  # Send to dump channel
+            bot.send_video(user_id, video=final_video_file)  # Send to user
+            
+            os.remove(final_video_file)  # Clean up the video file after sending
+            
     except Exception as e:
         print(f"Error downloading file: {e}")
-        return None
-
-def process_download_queue():
-    if not download_queue:
-        return
-
-    client, chat_id, url = download_queue.pop(0)  # Get the next request from the queue
-
-    client.send_message(chat_id, f"Downloading from {url}...")
-    
-    file_info = download_video(url)
-    
-    if file_info:
-        video_file, thumbnail_file = file_info
-        
-        # Send progress updates while downloading (simulated here)
-        for progress in range(0, 101, 10):  # Simulate progress updates
-            time.sleep(1)  # Simulate time taken for each step
-            client.send_message(chat_id, f"Download progress: {progress}%")
-        
-        # Send the video file and thumbnail after downloading is complete
-        client.send_video(chat_id, video=video_file, thumb=thumbnail_file)
-        
-        os.remove(video_file)  # Clean up the video file after sending
-        os.remove(thumbnail_file)  # Clean up the thumbnail after sending
-        
-    else:
-        client.send_message(chat_id, "Failed to download a valid video file.")
 
 if __name__ == '__main__':
     bot.run()
