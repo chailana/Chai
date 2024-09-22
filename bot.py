@@ -89,10 +89,8 @@ async def handle_message(client, message):
             
             for fmt in formats:
                 if 'height' in fmt and fmt['format_id'] not in seen_formats:
-                    button = InlineKeyboardButton(
-                        f"{fmt.get('format_note', 'No Note')} ({fmt['height']}p)", 
-                        callback_data=f"quality_{fmt['format_id']}"
-                    )
+                    button_label = f"{fmt.get('format_note', 'No Note')} ({fmt['height']}p)"
+                    button = InlineKeyboardButton(button_label, callback_data=f"quality_{fmt['format_id']}")
                     keyboard.append([button])
                     seen_formats.add(fmt['format_id'])  # Mark this format as seen
             
@@ -131,8 +129,8 @@ async def download_video(user_id, url, format_id):
             
              os.remove(final_video_file)  # Clean up the video file after sending
             
-     except Exception as e:
-    print(f"Error downloading file: {e}")
+    except Exception as e:
+         print(f"Error downloading file: {e}")
 
 def is_valid_url(url):
     return url.startswith("http://") or url.startswith("https://")
