@@ -1,4 +1,5 @@
 import os
+import tempfile
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -23,8 +24,8 @@ async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     ydl_opts = {
         'format': 'bestvideo+bestaudio/best',
-        'outtmpl': '%(title)s.%(ext)s',
-        'socket_timeout': 10,  # Set a socket timeout in seconds
+        'outtmpl': os.path.join(tempfile.gettempdir(), '%(title)s.%(ext)s'),  # Use temp directory
+        'socket_timeout': 10,
     }
 
     try:
@@ -39,8 +40,8 @@ async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             file_id = message.document.file_id
             
         await context.bot.send_video(chat_id=chat_id, video=file_id, supports_streaming=True)
-        
-        os.remove(filename)
+
+        os.remove(filename)  # Clean up the file
         await update.message.reply_text('Upload complete!')
 
     except yt_dlp.utils.DownloadError:
