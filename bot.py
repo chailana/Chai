@@ -22,6 +22,7 @@ async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ydl_opts = {
         'format': 'bestvideo+bestaudio/best',
         'outtmpl': '%(title)s.%(ext)s',
+        'socket_timeout': 10,  # Set a socket timeout in seconds
     }
 
     try:
@@ -30,7 +31,7 @@ async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             filename = ydl.prepare_filename(info)
 
         await update.message.reply_text('Download complete. Uploading to Telegram...')
-        
+
         with open(filename, 'rb') as video_file:
             message = await context.bot.send_document(chat_id=chat_id, document=video_file, filename=filename)
             file_id = message.document.file_id
