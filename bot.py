@@ -22,11 +22,11 @@ download_records = {}
 url_format_map = {}  # Store original URL and format ID mapping
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('Welcome! Use /download <URL> to fetch videos. You will see available formats for selection.')
+    await update.message.reply_text('👋 Welcome! Use /download <URL> to fetch videos. You will see available formats for selection. Enjoy! 🎉')
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
-        "Available Commands:\n"
+        "🛠️ Available Commands:\n"
         "/start - Start the bot\n"
         "/download <URL> - Download a video\n"
         "/settings - View or modify your settings\n"
@@ -39,9 +39,9 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_chat.id
     history = download_records.get(user_id, [])
     if not history:
-        await update.message.reply_text("No download history available.")
+        await update.message.reply_text("📜 No download history available.")
     else:
-        history_output = "Download History:\n" + "\n".join(history)
+        history_output = "📥 Download History:\n" + "\n".join(history)
         await update.message.reply_text(history_output)
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -50,15 +50,15 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in user_preferences:
         user_preferences[user_id] = {'upload_as_video': True, 'upload_thumbnail': True}
     
-    settings_info = "Current Settings:\n"
-    settings_info += f"Upload as Video: {'Enabled' if user_preferences[user_id]['upload_as_video'] else 'Disabled'}\n"
-    settings_info += f"Upload Thumbnail: {'Enabled' if user_preferences[user_id]['upload_thumbnail'] else 'Disabled'}\n"
+    settings_info = "⚙️ Current Settings:\n"
+    settings_info += f"Upload as Video: {'✅ Enabled' if user_preferences[user_id]['upload_as_video'] else '❌ Disabled'}\n"
+    settings_info += f"Upload Thumbnail: {'✅ Enabled' if user_preferences[user_id]['upload_thumbnail'] else '❌ Disabled'}\n"
 
     keyboard = [
         [InlineKeyboardButton(
-            "Toggle Upload as Video 🎥" if user_preferences[user_id]['upload_as_video'] else "Toggle Upload as File 🗃️",
+            "📹 Toggle Upload as Video" if user_preferences[user_id]['upload_as_video'] else "📂 Toggle Upload as File",
             callback_data='toggle_video')],
-        [InlineKeyboardButton("Toggle Upload Thumbnail", callback_data='toggle_thumbnail')],
+        [InlineKeyboardButton("🖼️ Toggle Upload Thumbnail", callback_data='toggle_thumbnail')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -74,12 +74,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == 'toggle_video':
         user_preferences[user_id]['upload_as_video'] = not user_preferences[user_id]['upload_as_video']
+        await settings(update, context)  # Refresh settings to show updated button
     elif query.data == 'toggle_thumbnail':
         user_preferences[user_id]['upload_thumbnail'] = not user_preferences[user_id]['upload_thumbnail']
+        await settings(update, context)  # Refresh settings to show updated button
 
 async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 1:
-        await update.message.reply_text('Please provide a URL for the video download.')
+        await update.message.reply_text('⚠️ Please provide a URL for the video download.')
         return
 
     url = context.args[0]
@@ -95,7 +97,7 @@ async def download_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await present_format_options(update, available_formats, url_hash)
     else:
-        await update.message.reply_text("No available formats for this video.")
+        await update.message.reply_text("⚠️ No available formats for this video.")
 
 async def present_format_options(update: Update, formats, url_hash):
     keyboard = []
@@ -111,9 +113,9 @@ async def present_format_options(update: Update, formats, url_hash):
         button = InlineKeyboardButton(text=button_text, callback_data=callback_data)
         keyboard.append([button])
 
-    keyboard.append([InlineKeyboardButton("CLOSE", callback_data="close")])  # Add a close option
+    keyboard.append([InlineKeyboardButton("❌ CLOSE", callback_data="close")])  # Add a close option
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Select the preferred format or file size to upload:", reply_markup=reply_markup)
+    await update.message.reply_text("🔍 Select the preferred format or file size to upload:", reply_markup=reply_markup)
 
 async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -128,9 +130,9 @@ async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_
         if original_url and selected_format:
             await execute_video_download(update, original_url, selected_format)
         else:
-            await query.message.reply_text("Error retrieving video details.")
+            await query.message.reply_text("⚠️ Error retrieving video details.")
     elif data[0] == "close":
-        await query.message.reply_text("Selection closed.")
+        await query.message.reply_text("❌ Selection closed.")
 
 async def execute_video_download(update: Update, url: str, format_id: str):
     user_id = update.effective_chat.id
@@ -150,14 +152,14 @@ async def execute_video_download(update: Update, url: str, format_id: str):
             title = info_dict.get('title', 'No Title')
 
         video_file_path = f"{title}.mp4"
-        await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_file_path, 'rb'), caption=f'Title: {title}')
+        await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_file_path, 'rb'), caption=f'🎥 Title: {title}')
 
         if user_id not in download_records:
             download_records[user_id] = []
         download_records[user_id].append(f"{title}")
 
     except Exception as e:
-        await update.message.reply_text(f'Error: {str(e)}')
+        await update.message.reply_text(f'⚠️ Error: {str(e)}')
     finally:
         try:
             os.remove(video_file_path)
@@ -180,7 +182,7 @@ async def track_progress(progress, update):
             ''.join(["░" for _ in range(bar_length - math.floor(percentage / (100 / bar_length)))])
         )
 
-        status_message = f"**Downloading...**\n\n{progress_bar}\n" \
+        status_message = f"**📥 Downloading...**\n\n{progress_bar}\n" \
                          f"**Progress:** {round(percentage, 2)}%\n" \
                          f"**Downloaded:** {format_bytes(downloaded_size)}\n" \
                          f"**Total Size:** {format_bytes(total_size)}\n" \
@@ -190,7 +192,7 @@ async def track_progress(progress, update):
         try:
             await update.message.reply_text(status_message)
         except Exception as e:
-            print(f"Error updating progress: {e}")
+            print(f"⚠️ Error updating progress: {e}")
 
 def format_bytes(size):
     if not size:
