@@ -46,13 +46,15 @@ class Database:
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(url)
-                return info_dict['formats']
+                return info_dict['formats']  # Return available formats without downloading
         except Exception as e:
             print(f"Error retrieving video formats: {e}")
             return None
 
+# Initialize the database connection
 db = Database(os.getenv("DATABASE_URL"), "UploadLinkToFileBot")
 
+# Initialize the bot with API ID, API Hash, and Bot Token
 bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 @bot.on_message(filters.command("start"))
@@ -112,7 +114,7 @@ async def download_video(user_id, url, format_id):
             
              os.remove(final_video_file)  # Clean up the video file after sending
             
-     except Exception as e:
+    except Exception as e:
          print(f"Error downloading file: {e}")
 
 def is_valid_url(url):
