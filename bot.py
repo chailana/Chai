@@ -1,6 +1,3 @@
-#Here is the complete updated code for your Telegram bot, incorporating the necessary adjustments to handle callback queries correctly and using the provided bot token:
-
-#```python
 import logging
 import os
 import yt_dlp
@@ -61,7 +58,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await query.message.reply_text(settings_info, reply_markup=reply_markup)  # Use query.message
+    await query.message.edit_text(settings_info, reply_markup=reply_markup)  # Update the same message instead of sending a new one
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -241,4 +238,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-# modifications or assistance, feel free to ask!
