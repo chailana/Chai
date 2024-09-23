@@ -1,6 +1,7 @@
 import os
 import logging
 import re
+import asyncio
 from dotenv import load_dotenv
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -19,17 +20,19 @@ load_dotenv()
 API_ID = os.getenv('API_ID')
 API_HASH = os.getenv('API_HASH')
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-DUMP_CHANNEL_ID = -1002247666039  # Replace with your actual channel ID
 
 # Initialize the bot client
 bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 @bot.on_message(filters.command("start"))
 async def send_welcome(client, message):
-    await client.send_message(message.chat.id, "Welcome! Send me a direct video link or a URL from supported websites (like YouTube) to download.\nUse /help for more commands.")
+    """Send a welcome message when the /start command is issued."""
+    await client.send_message(message.chat.id, 
+                               "Welcome! Send me a direct video link or a URL from supported websites (like YouTube) to download.\nUse /help for more commands.")
 
 @bot.on_message(filters.command("help"))
 async def send_help(client, message):
+    """Send help information when the /help command is issued."""
     help_text = (
         "/start - Welcome message\n"
         "/help - List of commands\n"
@@ -40,16 +43,17 @@ async def send_help(client, message):
 
 @bot.on_message(filters.text)
 async def handle_message(client, message):
+    """Handle direct text messages containing URLs."""
     url = message.text.strip()
     
     if is_valid_url(url):
-        # Download the video in best quality when a URL is sent directly
-        await download_video(message.chat.id, url, 'best')
+        await download_video(message.chat.id, url, 'best')  # Download video in best quality
     else:
         await client.send_message(message.chat.id, "Please send a valid URL.")
 
 @bot.on_message(filters.command("download"))
 async def handle_download_command(client, message):
+    """Handle the /download command to retrieve video formats."""
     if len(message.command) < 2:
         await client.send_message(message.chat.id, "Please provide a URL after the /download command.")
         return
@@ -61,13 +65,10 @@ async def handle_download_command(client, message):
         
         if formats:
             keyboard = []
-            seen_formats = set()  # To avoid duplicates
-            
             for format_id, height, note in formats:
                 button_label = f"{note} ({height}p)"
                 button = InlineKeyboardButton(button_label, callback_data=f"quality_{format_id}")
                 keyboard.append([button])
-                seen_formats.add(format_id)  # Mark this format as seen
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await client.send_message(message.chat.id, "Available quality options:", reply_markup=reply_markup)
@@ -78,6 +79,7 @@ async def handle_download_command(client, message):
 
 @bot.on_callback_query(filters.regex(r"quality_"))
 async def handle_quality_selection(client, callback_query):
+    """Handle quality selection when a user clicks on a format button."""
     user_id = callback_query.from_user.id
     selected_format_id = callback_query.data.split("_")[1]
 
@@ -88,6 +90,7 @@ async def handle_quality_selection(client, callback_query):
     await download_video(user_id, url, selected_format_id)
 
 async def download_video(user_id, url, format_id):
+    """Download the video and send it to the user."""
     ydl_opts = {
         'format': format_id,
         'outtmpl': '%(title)s.%(ext)s',
@@ -99,7 +102,7 @@ async def download_video(user_id, url, format_id):
              info_dict = ydl.extract_info(url , download=True)
              final_video_file= ydl.prepare_filename(info_dict)
 
-             await bot.send_video(DUMP_CHANNEL_ID , video=final_video_file)  # Send to dump channel
+             # Send the video directly to the user only
              await bot.send_video(user_id , video=final_video_file)  # Send to user
             
              os.remove(final_video_file)  # Clean up the video file after sending
@@ -112,6 +115,7 @@ async def download_video(user_id, url, format_id):
          await bot.send_message(user_id, "An unexpected error occurred while downloading the video.")
 
 def is_valid_url(url):
+    """Check if the provided URL is valid."""
     regex = re.compile(
         r'^(?:http|ftp)s?://'  # http:// or https://
         r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}|[A-Z0-9-]{2,}\.?)|'  # domain...
@@ -123,6 +127,7 @@ def is_valid_url(url):
     return re.match(regex, url) is not None
 
 async def get_video_formats(url):
+    """Retrieve available video formats for a given URL."""
     ydl_opts = {
         'format': 'bestvideo[height<=?1080]+bestaudio/best',  # Limits to 1080p
         'noplaylist': True,
@@ -146,15 +151,16 @@ async def get_video_formats(url):
         return None
 
 def progress_hook(d,user_id):
+     """Provide feedback on download progress."""
      if d['status'] == 'downloading':
          total_bytes = d.get('total_bytes', None)
          downloaded_bytes = d.get('downloaded_bytes', 0)
          
          if total_bytes is not None:
              percent = downloaded_bytes / total_bytes * 100
-             bot.send_message(user_id , f"Download progress: {percent:.2f}%")
+             asyncio.create_task(bot.send_message(user_id , f"Download progress: {percent:.2f}%"))  
          else:
-             bot.send_message(user_id , f"Downloaded {downloaded_bytes} bytes so far.")
+             asyncio.create_task(bot.send_message(user_id , f"Downloaded {downloaded_bytes} bytes so far."))
 
 if __name__ == '__main__':
      bot.run()
