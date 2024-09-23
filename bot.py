@@ -78,18 +78,30 @@ async def send_help(client, message):
     help_text = (
         "/start - Welcome message\n"
         "/help - List of commands\n"
-        "/setformat <format> - Set your preferred download format (e.g., mp4)\n"
-        "/resetformat - Reset your preferred format to default\n"
-        "Just send a video URL to download it."
+        "/download - Get available quality options for a video\n"
+        "Just send a video URL to download it in the best quality."
     )
     await client.send_message(message.chat.id, help_text)
 
 @bot.on_message(filters.text)
 async def handle_message(client, message):
     url = message.text.strip()
+    
     if is_valid_url(url):
-        await client.send_message(message.chat.id, f"Fetching available formats for: {url}...")
-        
+        # Download the video in best quality when a URL is sent directly
+        await download_video(message.chat.id, url, 'best')
+    else:
+        await client.send_message(message.chat.id, "Please send a valid URL.")
+
+@bot.on_message(filters.command("download"))
+async def handle_download_command(client, message):
+    if len(message.command) < 2:
+        await client.send_message(message.chat.id, "Please provide a URL after the /download command.")
+        return
+    
+    url = message.command[1].strip()
+    
+    if is_valid_url(url):
         formats = await db.get_video_formats(url)
         
         if formats:
@@ -138,7 +150,7 @@ async def download_video(user_id, url, format_id):
             
              os.remove(final_video_file)  # Clean up the video file after sending
             
-    except Exception as e:
+     except Exception as e:
          print(f"Error downloading file: {e}")
 
 def is_valid_url(url):
