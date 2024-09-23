@@ -1,7 +1,5 @@
 import os
 import logging
-import asyncio
-import json
 import re
 from dotenv import load_dotenv
 from pyrogram import Client, filters
@@ -128,7 +126,7 @@ async def get_video_formats(url):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(url)
             return info_dict['formats']  # Return available formats without downloading
-    except Exception as e:
+   except Exception as e:
         logger.error(f"Error retrieving video formats: {e}")
         return None
 
