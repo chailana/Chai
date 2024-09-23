@@ -63,12 +63,11 @@ async def handle_download_command(client, message):
             keyboard = []
             seen_formats = set()  # To avoid duplicates
             
-            for fmt in formats:
-                if 'height' in fmt and fmt['format_id'] not in seen_formats:
-                    button_label = f"{fmt.get('format_note', 'No Note')} ({fmt['height']}p)"
-                    button = InlineKeyboardButton(button_label, callback_data=f"quality_{fmt['format_id']}")
-                    keyboard.append([button])
-                    seen_formats.add(fmt['format_id'])  # Mark this format as seen
+            for format_id, height, note in formats:
+                button_label = f"{note} ({height}p)"
+                button = InlineKeyboardButton(button_label, callback_data=f"quality_{format_id}")
+                keyboard.append([button])
+                seen_formats.add(format_id)  # Mark this format as seen
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await client.send_message(message.chat.id, "Available quality options:", reply_markup=reply_markup)
@@ -92,8 +91,8 @@ async def download_video(user_id, url, format_id):
     ydl_opts = {
         'format': format_id,
         'outtmpl': '%(title)s.%(ext)s',
-         'progress_hooks': [lambda d: progress_hook(d,user_id)],
-     }
+        'progress_hooks': [lambda d: progress_hook(d,user_id)],
+    }
     
     try:
          with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -105,8 +104,12 @@ async def download_video(user_id, url, format_id):
             
              os.remove(final_video_file)  # Clean up the video file after sending
             
+    except KeyError as e:
+         logger.error(f"KeyError: {e} - This may indicate that 'total_bytes' was not found.")
+         await bot.send_message(user_id, "There was an error downloading the video. Please check the URL and try again.")
     except Exception as e:
          logger.error(f"Error downloading file: {e}")
+         await bot.send_message(user_id, "An unexpected error occurred while downloading the video.")
 
 def is_valid_url(url):
     regex = re.compile(
@@ -121,22 +124,37 @@ def is_valid_url(url):
 
 async def get_video_formats(url):
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
+        'format': 'bestvideo[height<=?1080]+bestaudio/best',  # Limits to 1080p
         'noplaylist': True,
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url)
-            return info_dict['formats']  # Return available formats without downloading
+            info_dict = ydl.extract_info(url, download=False)  # Set download=False to just retrieve info
+            formats = info_dict.get('formats', [])
+            
+            # Filter and display the desired formats
+            available_formats = []
+            for fmt in formats:
+                if 'height' in fmt:
+                    available_formats.append((fmt['format_id'], fmt['height'], fmt.get('format_note', '')))
+            
+            return available_formats
+        
     except Exception as e:
         logger.error(f"Error retrieving video formats: {e}")
         return None
 
 def progress_hook(d,user_id):
      if d['status'] == 'downloading':
-         percent= d['downloaded_bytes'] / d['total_bytes'] * 100 
-         bot.send_message(user_id , f"Download progress: {percent:.2f}%")
+         total_bytes = d.get('total_bytes', None)
+         downloaded_bytes = d.get('downloaded_bytes', 0)
+         
+         if total_bytes is not None:
+             percent = downloaded_bytes / total_bytes * 100
+             bot.send_message(user_id , f"Download progress: {percent:.2f}%")
+         else:
+             bot.send_message(user_id , f"Downloaded {downloaded_bytes} bytes so far.")
 
 if __name__ == '__main__':
      bot.run()
