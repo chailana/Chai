@@ -2,8 +2,10 @@ import os
 import logging
 import re
 import asyncio
+import time
+import math
 from dotenv import load_dotenv
-from pyrogram import Client, filters
+from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import yt_dlp
 
@@ -24,15 +26,18 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 # Initialize the bot client
 bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
+last_percentage = 0  # To track the last reported percentage
+
+def clean_url(url):
+    """Clean the URL by removing unnecessary query parameters."""
+    return url.split('?')[0]  # Keep only the base URL
+
 @bot.on_message(filters.command("start"))
 async def send_welcome(client, message):
-    """Send a welcome message when the /start command is issued."""
-    await client.send_message(message.chat.id, 
-                               "Welcome! Send me a direct video link or a URL from supported websites (like YouTube) to download.\nUse /help for more commands.")
+    await client.send_message(message.chat.id, "Welcome! Send me a direct video link or a URL from supported websites (like YouTube) to download.\nUse /help for more commands.")
 
 @bot.on_message(filters.command("help"))
 async def send_help(client, message):
-    """Send help information when the /help command is issued."""
     help_text = (
         "/start - Welcome message\n"
         "/help - List of commands\n"
@@ -43,25 +48,27 @@ async def send_help(client, message):
 
 @bot.on_message(filters.text)
 async def handle_message(client, message):
-    """Handle direct text messages containing URLs."""
     url = message.text.strip()
     
-    if is_valid_url(url):
-        await download_video(message.chat.id, url, 'best')  # Download video in best quality
+    cleaned_url = clean_url(url)  # Clean the URL before processing
+    
+    if is_valid_url(cleaned_url):
+        await download_video(message.chat.id, cleaned_url, 'best')  # Download video in best quality
     else:
         await client.send_message(message.chat.id, "Please send a valid URL.")
 
 @bot.on_message(filters.command("download"))
 async def handle_download_command(client, message):
-    """Handle the /download command to retrieve video formats."""
     if len(message.command) < 2:
         await client.send_message(message.chat.id, "Please provide a URL after the /download command.")
         return
     
     url = message.command[1].strip()
     
-    if is_valid_url(url):
-        formats = await get_video_formats(url)
+    cleaned_url = clean_url(url)  # Clean the URL before processing
+    
+    if is_valid_url(cleaned_url):
+        formats = await get_video_formats(cleaned_url)
         
         if formats:
             keyboard = []
@@ -79,7 +86,6 @@ async def handle_download_command(client, message):
 
 @bot.on_callback_query(filters.regex(r"quality_"))
 async def handle_quality_selection(client, callback_query):
-    """Handle quality selection when a user clicks on a format button."""
     user_id = callback_query.from_user.id
     selected_format_id = callback_query.data.split("_")[1]
 
@@ -150,15 +156,85 @@ async def get_video_formats(url):
         logger.error(f"Error retrieving video formats: {e}")
         return None
 
+async def progress_for_pyrogram(current, total, ud_type, message, start_time):
+    """Provide detailed progress feedback during downloads."""
+    
+    now = time.time()
+    diff = now - start_time
+    
+    percentage = current * 100 / total if total else 0
+    speed = current / diff if diff > 0 else 0
+    
+    elapsed_time_str = TimeFormatter(milliseconds=round(diff * 1000))
+    
+    if total > current:
+        time_to_completion_str = TimeFormatter(milliseconds=round((total - current) / speed * 1000)) if speed > 0 else "Unknown"
+        
+        status_message = (
+            f"**{ud_type}**\n"
+            f"Progress: [{current}/{total}] ({percentage:.2f}%)\n"
+            f"Speed: {humanbytes(speed)}\n"
+            f"Elapsed Time: {elapsed_time_str}\n"
+            f"Estimated Time to Completion: {time_to_completion_str}"
+        )
+        
+        try:
+            await message.edit(text=status_message,
+                               parse_mode=enums.ParseMode.MARKDOWN,
+                               reply_markup=InlineKeyboardMarkup(
+                                   [[InlineKeyboardButton('⛔️ Cancel', callback_data='close')]]
+                               ))
+        except Exception as e:
+            logger.error(f"Error updating progress message: {e}")
+
+def humanbytes(size):
+    """Convert bytes to a human-readable format."""
+    if size is None or size < 0:
+        return ""
+    
+    power = 1024
+    n = 0
+    Dic_powerN = {0: '', 1: 'K', 2: 'M', 3: 'G', 4: 'T'}
+    
+    while size >= power and n < len(Dic_powerN) - 1:
+        size /= power
+        n += 1
+        
+    return f"{round(size)} {Dic_powerN[n]}B"
+
+def TimeFormatter(milliseconds: int) -> str:
+    """Format time in milliseconds to a human-readable string."""
+    
+    seconds, milliseconds = divmod(int(milliseconds), 1000)
+    
+    minutes, seconds = divmod(seconds, 60)
+    
+    hours, minutes = divmod(minutes, 60)
+    
+    days, hours = divmod(hours, 24)
+    
+    tmp = ((str(days) + "d ") if days else "") + \
+          ((str(hours) + "h ") if hours else "") + \
+          ((str(minutes) + "m ") if minutes else "") + \
+          ((str(seconds) + "s ") if seconds else "") + \
+          ((str(milliseconds) + "ms") if milliseconds else "")
+          
+    return tmp.strip()
+
 def progress_hook(d,user_id):
      """Provide feedback on download progress."""
+     global last_percentage  
+     
      if d['status'] == 'downloading':
          total_bytes = d.get('total_bytes', None)
          downloaded_bytes = d.get('downloaded_bytes', 0)
          
          if total_bytes is not None:
              percent = downloaded_bytes / total_bytes * 100
-             asyncio.create_task(bot.send_message(user_id , f"Download progress: {percent:.2f}%"))  
+            
+             if percent >= last_percentage + 5:  # Update every 5%
+                 asyncio.create_task(bot.send_message(user_id , f"Download progress: {percent:.2f}% ({downloaded_bytes} bytes)"))
+                 last_percentage = percent  
          else:
              asyncio.create_task(bot.send_message(user_id , f"Downloaded {downloaded_bytes} bytes so far."))
 
