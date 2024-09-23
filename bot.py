@@ -78,7 +78,7 @@ async def send_help(client, message):
     help_text = (
         "/start - Welcome message\n"
         "/help - List of commands\n"
-        "/download - Get available quality options for a video\n"
+        "/download <URL> - Get available quality options for a video\n"
         "Just send a video URL to download it in the best quality."
     )
     await client.send_message(message.chat.id, help_text)
@@ -150,8 +150,8 @@ async def download_video(user_id, url, format_id):
             
              os.remove(final_video_file)  # Clean up the video file after sending
             
-    except Exception as e:
-         print(f"Error downloading file: {e}")
+     except Exception as e:
+         logger.error(f"Error downloading file: {e}")
 
 def is_valid_url(url):
     return url.startswith("http://") or url.startswith("https://")
