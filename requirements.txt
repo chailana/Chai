@@ -3,7 +3,7 @@ motor
 Flask
 pyTelegramBotAPI==4.0.0
 python-dotenv==0.19.0
-yt-dlp>=2024.1.2 
+yt-dlp
 gunicorn
 pyrogram>=2.0.41
 TgCrypto>=1.2.2
