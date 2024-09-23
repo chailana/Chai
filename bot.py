@@ -150,7 +150,7 @@ async def download_video(user_id, url, format_id):
             
              os.remove(final_video_file)  # Clean up the video file after sending
             
-     except Exception as e:
+    except Exception as e:
          logger.error(f"Error downloading file: {e}")
 
 def is_valid_url(url):
