@@ -22,10 +22,13 @@ API_HASH = os.getenv('API_HASH')
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 DUMP_CHANNEL_ID = -1002247666039  # Replace with your channel ID
 
+# MongoDB connection string
+DATABASE_URL = 'mongodb+srv://chaiwala:autqio99wvMJEr0l@cluster0.nupdo.mongodb.net/chai?retryWrites=true&w=majority'
+
 class Database:
-    def __init__(self, uri, database_name):
+    def __init__(self, uri):
         self._client = motor.motor_asyncio.AsyncIOMotorClient(uri)
-        self.db = self._client[database_name]
+        self.db = self._client['chai']  # Use 'chai' as the database name
         self.col = self.db.users
 
     def new_user(self, id):
@@ -61,7 +64,7 @@ class Database:
             return None
 
 # Initialize the database connection
-db = Database(os.getenv("DATABASE_URL"), "UploadLinkToFileBot")
+db = Database(DATABASE_URL)
 
 # Initialize the bot with API ID, API Hash, and Bot Token
 bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
