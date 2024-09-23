@@ -3,6 +3,7 @@ import datetime
 import logging
 import asyncio
 import json
+import re
 from dotenv import load_dotenv
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -15,15 +16,17 @@ logging.basicConfig(level=logging.DEBUG,
 logger = logging.getLogger(__name__)
 logging.getLogger("pyrogram").setLevel(logging.WARNING)
 
+# Load environment variables from .env file
 load_dotenv()
-
-API_ID = os.getenv('API_ID')
-API_HASH = os.getenv('API_HASH')
-BOT_TOKEN = os.getenv('BOT_TOKEN')
-DUMP_CHANNEL_ID = -1002247666039  # Replace with your channel ID
 
 # MongoDB connection string
 DATABASE_URL = 'mongodb+srv://chaiwala:autqio99wvMJEr0l@cluster0.nupdo.mongodb.net/chai?retryWrites=true&w=majority'
+
+# Initialize the bot with API ID, API Hash, and Bot Token
+API_ID = os.getenv('API_ID')
+API_HASH = os.getenv('API_HASH')
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+DUMP_CHANNEL_ID = -1002247666039  # Replace with your actual channel ID
 
 class Database:
     def __init__(self, uri):
@@ -66,7 +69,7 @@ class Database:
 # Initialize the database connection
 db = Database(DATABASE_URL)
 
-# Initialize the bot with API ID, API Hash, and Bot Token
+# Initialize the bot client
 bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 @bot.on_message(filters.command("start"))
@@ -153,11 +156,19 @@ async def download_video(user_id, url, format_id):
             
              os.remove(final_video_file)  # Clean up the video file after sending
             
-    except Exception as e:
+     except Exception as e:
          logger.error(f"Error downloading file: {e}")
 
 def is_valid_url(url):
-    return url.startswith("http://") or url.startswith("https://")
+    regex = re.compile(
+        r'^(?:http|ftp)s?://'  # http:// or https://
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
+        r'localhost|'  # localhost...
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|'  # IPv4
+        r'\[?[A-F0-9]*:[A-F0-9:]+\]?)'  # IPv6
+        r'(?::\d+)?'  # optional port
+        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+    return re.match(regex, url) is not None
 
 def progress_hook(d,user_id):
      if d['status'] == 'downloading':
