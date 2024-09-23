@@ -21,6 +21,9 @@ API_HASH = os.getenv('API_HASH')
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 DUMP_CHANNEL_ID = -1002247666039  # Replace with your actual channel ID
 
+# Initialize the bot client
+bot = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+
 @bot.on_message(filters.command("start"))
 async def send_welcome(client, message):
     await client.send_message(message.chat.id, "Welcome! Send me a direct video link or a URL from supported websites (like YouTube) to download.\nUse /help for more commands.")
